@@ -1,12 +1,13 @@
 import Foundation
-import Network
-import Synchronization
 
 ///
 /// Minimal HTTP/1.1 client that speaks to the Docker Engine API
 /// over the Unix domain socket that Docker Desktop exposes on macOS.
 ///
-struct DockerEngineClient {
+/// Uses POSIX sockets directly; `NWConnection` cannot drive a Unix-domain
+/// socket with TCP parameters on macOS and fails with `ENETDOWN`.
+///
+struct DockerEngineClient: Sendable {
     /// The file-system path to the Docker Engine Unix domain socket.
     let socketPath: String
 
@@ -62,85 +63,87 @@ struct DockerEngineClient {
 
         let socketPath = self.socketPath // capture value, not self
 
-        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(statusCode: Int, body: Data), Error>) in
-            let connection = NWConnection(to: .unix(path: socketPath), using: .tcp)
-
-            // Mutex-protected flag ensures continuation.resume is called exactly once
-            // even if NWConnection delivers overlapping state/send callbacks.
-            let done = Mutex<Bool>(false)
-
-            @Sendable func resumeOnce(with result: Result<(statusCode: Int, body: Data), Error>) {
-                let shouldResume = done.withLock { flag -> Bool in
-                    guard !flag else { return false }
-                    flag = true
-                    return true
-                }
-                guard shouldResume else { return }
-                connection.cancel()
-                continuation.resume(with: result)
-            }
-
-            connection.stateUpdateHandler = { state in
-                switch state {
-                case .ready:
-                    connection.send(content: requestData, completion: .contentProcessed { error in
-                        if let error {
-                            resumeOnce(with: .failure(error))
-                            return
-                        }
-                        receiveAll(connection: connection, accumulated: Data()) { result in
-                            switch result {
-                            case let .success(responseData):
-                                if let parsed = parseHTTPResponse(responseData) {
-                                    resumeOnce(with: .success(parsed))
-                                } else {
-                                    resumeOnce(with: .failure(DockerClientError.invalidResponse))
-                                }
-                            case let .failure(err):
-                                resumeOnce(with: .failure(err))
-                            }
-                        }
-                    })
-                case let .failed(error):
-                    resumeOnce(with: .failure(error))
-                case .cancelled, .setup, .preparing, .waiting:
-                    break
-                @unknown default:
-                    break
+        return try await withCheckedThrowingContinuation { continuation in
+            // Dispatch to a GCD thread so the blocking POSIX calls
+            // don't stall the Swift concurrency cooperative thread pool.
+            DispatchQueue.global(qos: .utility).async {
+                do {
+                    let result = try dockerSocketRequest(socketPath: socketPath, requestData: requestData)
+                    continuation.resume(returning: result)
+                } catch {
+                    continuation.resume(throwing: error)
                 }
             }
-
-            connection.start(queue: .global(qos: .utility))
         }
     }
 }
 
-// MARK: - Private helpers (file-private free functions)
+// MARK: - POSIX-socket transport (file-private free functions)
 
-private func receiveAll(
-    connection: NWConnection,
-    accumulated: Data,
-    completion: @escaping @Sendable (Result<Data, Error>) -> Void
-) {
-    connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, isComplete, error in
-        var updated = accumulated
-        if let data { updated.append(data) }
+private func dockerSocketRequest(
+    socketPath: String,
+    requestData: Data
+) throws -> (statusCode: Int, body: Data) {
 
-        if let error {
-            completion(.failure(error))
-        } else if isComplete {
-            completion(.success(updated))
-        } else {
-            receiveAll(connection: connection, accumulated: updated, completion: completion)
+    // ── 1. Open a Unix-domain stream socket ─────────────────────────────────
+    let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+    guard fd >= 0 else {
+        throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+    }
+    defer { close(fd) }
+
+    // ── 2. Connect to the Docker socket path ─────────────────────────────────
+    var addr = sockaddr_un()
+    addr.sun_family = sa_family_t(AF_UNIX)
+    socketPath.withCString { src in
+        withUnsafeMutableBytes(of: &addr.sun_path) { bytes in
+            _ = memcpy(bytes.baseAddress!, src, strlen(src) + 1)
         }
     }
+    let connectResult = withUnsafePointer(to: &addr) { addrPtr in
+        addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+            connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+        }
+    }
+    guard connectResult == 0 else {
+        throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+    }
+
+    // ── 3. Send the full HTTP request ────────────────────────────────────────
+    var totalSent = 0
+    while totalSent < requestData.count {
+        let sent = requestData.withUnsafeBytes { ptr in
+            send(fd, ptr.baseAddress!.advanced(by: totalSent), ptr.count - totalSent, 0)
+        }
+        guard sent > 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+        totalSent += sent
+    }
+
+    // ── 4. Read until the server closes the connection (Connection: close) ───
+    var responseData = Data()
+    var buffer = [UInt8](repeating: 0, count: 8_192)
+    while true {
+        let n = buffer.withUnsafeMutableBytes { ptr in
+            recv(fd, ptr.baseAddress!, ptr.count, 0)
+        }
+        if n <= 0 { break }
+        responseData.append(buffer, count: n)
+    }
+
+    // ── 5. Parse the HTTP response ───────────────────────────────────────────
+    guard let parsed = parseHTTPResponse(responseData) else {
+        throw DockerClientError.invalidResponse
+    }
+    return parsed
 }
 
 private func parseHTTPResponse(_ data: Data) -> (statusCode: Int, body: Data)? {
     guard let separatorRange = data.range(of: Data("\r\n\r\n".utf8)) else { return nil }
 
     let headerData = data[..<separatorRange.lowerBound]
-    let body = Data(data[separatorRange.upperBound...])
+    var body = Data(data[separatorRange.upperBound...])
 
     guard
         let headerText = String(data: headerData, encoding: .utf8),
@@ -151,5 +154,33 @@ private func parseHTTPResponse(_ data: Data) -> (statusCode: Int, body: Data)? {
     let parts = statusLine.split(separator: " ", maxSplits: 2)
     guard parts.count >= 2, let statusCode = Int(parts[1]) else { return nil }
 
+    if headerText.lowercased().contains("transfer-encoding: chunked") {
+        body = decodeChunked(body)
+    }
+
     return (statusCode: statusCode, body: body)
+}
+
+private func decodeChunked(_ data: Data) -> Data {
+    var result = Data()
+    var position = data.startIndex
+    let crlf = Data("\r\n".utf8)
+
+    while position < data.endIndex {
+        guard let crlfRange = data[position...].range(of: crlf) else { break }
+
+        let sizeHex = data[position..<crlfRange.lowerBound]
+        guard
+            let sizeString = String(data: sizeHex, encoding: .ascii),
+            let chunkSize = Int(sizeString.trimmingCharacters(in: .whitespaces), radix: 16),
+            chunkSize > 0
+        else { break }
+
+        let chunkStart = crlfRange.upperBound
+        guard let chunkEnd = data.index(chunkStart, offsetBy: chunkSize, limitedBy: data.endIndex) else { break }
+        result.append(data[chunkStart..<chunkEnd])
+        position = data.index(chunkEnd, offsetBy: 2, limitedBy: data.endIndex) ?? data.endIndex
+    }
+
+    return result
 }
