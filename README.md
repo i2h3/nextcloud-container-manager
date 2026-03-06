@@ -1,14 +1,15 @@
-# Swift Nextcloud Test Containers
+# Swift Nextcloud Manager
 
 Control the local deployment of Nextcloud Docker containers programmatically from Swift.
 
 ## What does it do?
 
-Talk to the [Docker Engine API](https://docs.docker.com/reference/api/engine/) on macOS to deploy ephemeral Nextcloud containers for automated tests.
+Talk to the [Docker Engine API](https://docs.docker.com/reference/api/engine/) on macOS to deploy ephemeral Nextcloud containers for running automated tests against them.
 
 ## Who is this for?
 
 This package targets developers working on native Nextcloud client apps.
+It helps them to implement tests running against a real Nextcloud server and enables end-to-end testing.
 
 ## License
 
