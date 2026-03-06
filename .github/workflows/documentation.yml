@@ -23,7 +23,7 @@ jobs:
           $(xcrun --find docc) process-archive \
             transform-for-static-hosting ./DerivedData/Build/Products/Debug/NextcloudContainerManager.doccarchive \
             --output-path ./docs \
-            --hosting-base-path /nextcloudcontainermanager
+            --hosting-base-path /nextcloud-container-manager
       - name: Create root redirect
         run: |
           cat > ./docs/index.html << 'EOF'
