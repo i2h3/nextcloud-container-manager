@@ -10,6 +10,10 @@ Talk to the [Docker Engine API](https://docs.docker.com/reference/api/engine/) o
 
 This package targets developers working on native Nextcloud client apps.
 
+## License
+
+See [LICENSE](LICENSE).
+
 ## Contributing
 
 [SwiftFormat](https://github.com/nicklockwood/SwiftFormat) was introduced into this project.
