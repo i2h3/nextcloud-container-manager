@@ -20,7 +20,15 @@ Task.detached {
     do {
         print("Deploying nextcloud:\(tag)…")
         let container = try await NextcloudContainerManager.deploy(
-            configuration: NextcloudConfiguration(tag: tag)
+            configuration: NextcloudConfiguration(
+                tag: tag,
+                disabledApps: [
+                    "bruteforcesettings",
+                    "firstrunwizard",
+                    "nextcloud_announcements",
+                    "password_policy",
+                ]
+            )
         )
         print("Container ready")
         print("  ID:  \(container.id.prefix(12))")
