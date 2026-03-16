@@ -1,7 +1,7 @@
 ///
 /// The interface of an individual test container deployment representation.
 ///
-public struct NextcloudContainer: Identifiable {
+public struct NextcloudContainer: Identifiable, Sendable {
     ///
     /// The initial configuration this container was created with.
     ///
