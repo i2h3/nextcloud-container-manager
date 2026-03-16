@@ -49,11 +49,16 @@ public enum NextcloudContainerManager {
             throw DockerClientError.unexpectedStatusCode(startResponse.statusCode, message)
         }
 
-        return NextcloudContainer(
+        let container = NextcloudContainer(
             configuration: configuration,
             id: created.Id,
             port: UInt(port),
             client: client
         )
+
+        // 5. Run post-deployment provisioning (wait for readiness, disable apps).
+        try await container.provision()
+
+        return container
     }
 }

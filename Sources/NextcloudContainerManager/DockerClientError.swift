@@ -8,4 +8,6 @@ enum DockerClientError: Error {
     case invalidResponse
     /// The Docker daemon returned an unexpected HTTP status code.
     case unexpectedStatusCode(Int, String)
+    /// The Nextcloud instance did not become ready within the expected time.
+    case timeout
 }

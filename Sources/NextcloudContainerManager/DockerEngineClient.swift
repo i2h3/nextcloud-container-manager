@@ -7,7 +7,7 @@ import Foundation
 /// Uses POSIX sockets directly; `NWConnection` cannot drive a Unix-domain
 /// socket with TCP parameters on macOS and fails with `ENETDOWN`.
 ///
-struct DockerEngineClient: Sendable {
+struct DockerEngineClient {
     /// The file-system path to the Docker Engine Unix domain socket.
     let socketPath: String
 
@@ -36,6 +36,13 @@ struct DockerEngineClient: Sendable {
     ///
     func post(path: String) async throws -> (statusCode: Int, body: Data) {
         try await send(method: "POST", path: path, body: nil)
+    }
+
+    ///
+    /// Send a `GET` request with no body.
+    ///
+    func get(path: String) async throws -> (statusCode: Int, body: Data) {
+        try await send(method: "GET", path: path, body: nil)
     }
 
     ///
@@ -84,7 +91,6 @@ private func dockerSocketRequest(
     socketPath: String,
     requestData: Data
 ) throws -> (statusCode: Int, body: Data) {
-
     // ── 1. Open a Unix-domain stream socket ─────────────────────────────────
     let fd = socket(AF_UNIX, SOCK_STREAM, 0)
     guard fd >= 0 else {
@@ -123,7 +129,7 @@ private func dockerSocketRequest(
 
     // ── 4. Read until the server closes the connection (Connection: close) ───
     var responseData = Data()
-    var buffer = [UInt8](repeating: 0, count: 8_192)
+    var buffer = [UInt8](repeating: 0, count: 8192)
     while true {
         let n = buffer.withUnsafeMutableBytes { ptr in
             recv(fd, ptr.baseAddress!, ptr.count, 0)
@@ -169,7 +175,7 @@ private func decodeChunked(_ data: Data) -> Data {
     while position < data.endIndex {
         guard let crlfRange = data[position...].range(of: crlf) else { break }
 
-        let sizeHex = data[position..<crlfRange.lowerBound]
+        let sizeHex = data[position ..< crlfRange.lowerBound]
         guard
             let sizeString = String(data: sizeHex, encoding: .ascii),
             let chunkSize = Int(sizeString.trimmingCharacters(in: .whitespaces), radix: 16),
@@ -178,7 +184,7 @@ private func decodeChunked(_ data: Data) -> Data {
 
         let chunkStart = crlfRange.upperBound
         guard let chunkEnd = data.index(chunkStart, offsetBy: chunkSize, limitedBy: data.endIndex) else { break }
-        result.append(data[chunkStart..<chunkEnd])
+        result.append(data[chunkStart ..< chunkEnd])
         position = data.index(chunkEnd, offsetBy: 2, limitedBy: data.endIndex) ?? data.endIndex
     }
 
