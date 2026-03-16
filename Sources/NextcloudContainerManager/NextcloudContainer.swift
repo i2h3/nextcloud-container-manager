@@ -123,8 +123,9 @@ public struct NextcloudContainer: Identifiable, Sendable {
             )
             guard startResponse.statusCode == 200 else { return }
 
-            // 3. Wait for the command to finish.
-            while true {
+            // 3. Wait for the command to finish (up to 30 seconds).
+            let execDeadline = Date().addingTimeInterval(30)
+            while Date() < execDeadline {
                 let inspectResponse = try await client.get(
                     path: "/exec/\(created.Id)/json"
                 )

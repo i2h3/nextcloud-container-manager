@@ -7,7 +7,7 @@ import Foundation
 /// Uses POSIX sockets directly; `NWConnection` cannot drive a Unix-domain
 /// socket with TCP parameters on macOS and fails with `ENETDOWN`.
 ///
-struct DockerEngineClient {
+struct DockerEngineClient: Sendable {
     /// The file-system path to the Docker Engine Unix domain socket.
     let socketPath: String
 
