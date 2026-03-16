@@ -50,7 +50,9 @@ public struct NextcloudContainer: Identifiable, Sendable {
     /// ``NextcloudConfiguration/disabledApps``.
     ///
     func provision() async throws {
-        guard !configuration.disabledApps.isEmpty else { return }
+        guard !configuration.disabledApps.isEmpty else {
+            return
+        }
 
         try await waitUntilReady()
 
@@ -109,7 +111,9 @@ public struct NextcloudContainer: Identifiable, Sendable {
                 path: "/containers/\(id)/exec",
                 body: createRequest
             )
-            guard createResponse.statusCode == 201 else { return }
+            guard createResponse.statusCode == 201 else {
+                return
+            }
             let created = try JSONDecoder().decode(
                 CreateExecResponse.self,
                 from: createResponse.body
@@ -121,7 +125,9 @@ public struct NextcloudContainer: Identifiable, Sendable {
                 path: "/exec/\(created.Id)/start",
                 body: startRequest
             )
-            guard startResponse.statusCode == 200 else { return }
+            guard startResponse.statusCode == 200 else {
+                return
+            }
 
             // 3. Wait for the command to finish (up to 30 seconds).
             let execDeadline = Date().addingTimeInterval(30)
@@ -133,7 +139,9 @@ public struct NextcloudContainer: Identifiable, Sendable {
                     ExecInspectResponse.self,
                     from: inspectResponse.body
                 )
-                if !info.Running { break }
+                if !info.Running {
+                    break
+                }
                 try await Task.sleep(for: .seconds(1))
             }
         } catch {

@@ -64,7 +64,9 @@ struct DockerEngineClient: Sendable {
         // Build as a let so it is safe to capture in @Sendable closures.
         let requestData: Data = {
             var d = Data(requestText.utf8)
-            if let body { d.append(body) }
+            if let body {
+                d.append(body)
+            }
             return d
         }()
 
@@ -134,7 +136,9 @@ private func dockerSocketRequest(
         let n = buffer.withUnsafeMutableBytes { ptr in
             recv(fd, ptr.baseAddress!, ptr.count, 0)
         }
-        if n <= 0 { break }
+        if n <= 0 {
+            break
+        }
         responseData.append(buffer, count: n)
     }
 
@@ -146,7 +150,9 @@ private func dockerSocketRequest(
 }
 
 private func parseHTTPResponse(_ data: Data) -> (statusCode: Int, body: Data)? {
-    guard let separatorRange = data.range(of: Data("\r\n\r\n".utf8)) else { return nil }
+    guard let separatorRange = data.range(of: Data("\r\n\r\n".utf8)) else {
+        return nil
+    }
 
     let headerData = data[..<separatorRange.lowerBound]
     var body = Data(data[separatorRange.upperBound...])
@@ -154,11 +160,15 @@ private func parseHTTPResponse(_ data: Data) -> (statusCode: Int, body: Data)? {
     guard
         let headerText = String(data: headerData, encoding: .utf8),
         let statusLine = headerText.components(separatedBy: "\r\n").first
-    else { return nil }
+    else {
+        return nil
+    }
 
     // "HTTP/1.1 201 Created"
     let parts = statusLine.split(separator: " ", maxSplits: 2)
-    guard parts.count >= 2, let statusCode = Int(parts[1]) else { return nil }
+    guard parts.count >= 2, let statusCode = Int(parts[1]) else {
+        return nil
+    }
 
     if headerText.lowercased().contains("transfer-encoding: chunked") {
         body = decodeChunked(body)
@@ -173,17 +183,23 @@ private func decodeChunked(_ data: Data) -> Data {
     let crlf = Data("\r\n".utf8)
 
     while position < data.endIndex {
-        guard let crlfRange = data[position...].range(of: crlf) else { break }
+        guard let crlfRange = data[position...].range(of: crlf) else {
+            break
+        }
 
         let sizeHex = data[position ..< crlfRange.lowerBound]
         guard
             let sizeString = String(data: sizeHex, encoding: .ascii),
             let chunkSize = Int(sizeString.trimmingCharacters(in: .whitespaces), radix: 16),
             chunkSize > 0
-        else { break }
+        else {
+            break
+        }
 
         let chunkStart = crlfRange.upperBound
-        guard let chunkEnd = data.index(chunkStart, offsetBy: chunkSize, limitedBy: data.endIndex) else { break }
+        guard let chunkEnd = data.index(chunkStart, offsetBy: chunkSize, limitedBy: data.endIndex) else {
+            break
+        }
         result.append(data[chunkStart ..< chunkEnd])
         position = data.index(chunkEnd, offsetBy: 2, limitedBy: data.endIndex) ?? data.endIndex
     }

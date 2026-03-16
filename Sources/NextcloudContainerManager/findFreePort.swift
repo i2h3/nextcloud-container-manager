@@ -13,7 +13,9 @@ import Darwin
 ///
 func findFreePort() throws -> UInt16 {
     let sock = Darwin.socket(AF_INET, SOCK_STREAM, 0)
-    guard sock >= 0 else { throw DockerClientError.couldNotFindFreePort }
+    guard sock >= 0 else {
+        throw DockerClientError.couldNotFindFreePort
+    }
     defer { Darwin.close(sock) }
 
     var addr = sockaddr_in()
@@ -27,7 +29,9 @@ func findFreePort() throws -> UInt16 {
             Darwin.bind(sock, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
         }
     }
-    guard bindResult == 0 else { throw DockerClientError.couldNotFindFreePort }
+    guard bindResult == 0 else {
+        throw DockerClientError.couldNotFindFreePort
+    }
 
     var addrLen = socklen_t(MemoryLayout<sockaddr_in>.size)
     let nameResult = withUnsafeMutablePointer(to: &addr) {
@@ -35,7 +39,9 @@ func findFreePort() throws -> UInt16 {
             Darwin.getsockname(sock, $0, &addrLen)
         }
     }
-    guard nameResult == 0 else { throw DockerClientError.couldNotFindFreePort }
+    guard nameResult == 0 else {
+        throw DockerClientError.couldNotFindFreePort
+    }
 
     return addr.sin_port.bigEndian
 }
