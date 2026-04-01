@@ -17,7 +17,11 @@ struct DockerEngineClient: Sendable {
     /// - Parameters:
     ///     - socketPath: Defaults to the standard Docker Desktop socket location.
     ///
-    init(socketPath: String = "/var/run/docker.sock") {
+    init(socketPath: String = "/var/run/docker.sock") throws {
+        guard FileManager.default.fileExists(atPath: socketPath) else {
+            throw DockerClientError.socketNotFound(socketPath)
+        }
+
         self.socketPath = socketPath
     }
 

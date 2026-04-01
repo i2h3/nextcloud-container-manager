@@ -10,4 +10,6 @@ enum DockerClientError: Error {
     case unexpectedStatusCode(Int, String)
     /// The Nextcloud instance did not become ready within the expected time.
     case timeout
+    /// The Docker Engine Unix domain socket was not found at the given path.
+    case socketNotFound(String)
 }
