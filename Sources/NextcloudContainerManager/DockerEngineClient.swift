@@ -7,7 +7,7 @@ import Foundation
 /// Uses POSIX sockets directly; `NWConnection` cannot drive a Unix-domain
 /// socket with TCP parameters on macOS and fails with `ENETDOWN`.
 ///
-struct DockerEngineClient: Sendable {
+struct DockerEngineClient {
     /// The file-system path to the Docker Engine Unix domain socket.
     let socketPath: String
 
@@ -30,7 +30,7 @@ struct DockerEngineClient: Sendable {
     ///
     /// Send a `POST` request with a JSON-encoded body.
     ///
-    func post<RequestBody: Encodable>(path: String, body: RequestBody) async throws -> (statusCode: Int, body: Data) {
+    func post(path: String, body: some Encodable) async throws -> (statusCode: Int, body: Data) {
         let data = try JSONEncoder().encode(body)
         return try await send(method: "POST", path: path, body: data)
     }
@@ -74,7 +74,7 @@ struct DockerEngineClient: Sendable {
             return d
         }()
 
-        let socketPath = self.socketPath // capture value, not self
+        let socketPath = socketPath // capture value, not self
 
         return try await withCheckedThrowingContinuation { continuation in
             // Dispatch to a GCD thread so the blocking POSIX calls

@@ -4,28 +4,12 @@ import Foundation
 /// The primary interface of this library.
 ///
 public enum NextcloudContainerManager {
-    ///
-    /// Deploy a new container.
-    ///
-    /// If the Docker Engine socket is not found, this method checks for Docker Desktop at
-    /// `/Applications/Docker.app` and attempts to launch it. It then polls for the socket
-    /// to become available for up to 10 seconds before retrying. If Docker Desktop is not
-    /// installed or cannot be launched, a ``NextcloudContainerManagerError`` is thrown.
-    ///
-    /// - Parameters:
-    ///     - configuration: Deployment options. Defaults to ``NextcloudConfiguration/init()``.
-    ///
-    /// - Returns: A handle for the running container.
-    ///
-    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop
-    ///     is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if
-    ///     it cannot be launched, or a ``DockerClientError`` for any API-level failure.
-    ///
-    public static func deploy(configuration: NextcloudConfiguration = NextcloudConfiguration()) async throws -> NextcloudContainer {
+    private static func makeDockerEngineClient() async throws -> DockerEngineClient {
         let client: DockerEngineClient
+
         do {
             client = try DockerEngineClient()
-        } catch DockerClientError.socketNotFound(let socketPath) {
+        } catch let DockerClientError.socketNotFound(socketPath) {
             guard FileManager.default.fileExists(atPath: "/Applications/Docker.app") else {
                 throw NextcloudContainerManagerError.dockerDesktopNotFound
             }
@@ -53,6 +37,29 @@ public enum NextcloudContainerManager {
 
             client = try DockerEngineClient()
         }
+
+        return client
+    }
+
+    ///
+    /// Deploy a new container.
+    ///
+    /// If the Docker Engine socket is not found, this method checks for Docker Desktop at
+    /// `/Applications/Docker.app` and attempts to launch it. It then polls for the socket
+    /// to become available for up to 10 seconds before retrying. If Docker Desktop is not
+    /// installed or cannot be launched, a ``NextcloudContainerManagerError`` is thrown.
+    ///
+    /// - Parameters:
+    ///     - configuration: Deployment options. Defaults to ``NextcloudConfiguration/init()``.
+    ///
+    /// - Returns: A handle for the running container.
+    ///
+    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop
+    ///     is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if
+    ///     it cannot be launched, or a ``DockerClientError`` for any API-level failure.
+    ///
+    public static func deploy(configuration: NextcloudConfiguration = NextcloudConfiguration()) async throws -> NextcloudContainer {
+        let client = try await makeDockerEngineClient()
 
         // 1. Find a free host port to forward to container port 80.
         let port = try findFreePort()
@@ -102,5 +109,34 @@ public enum NextcloudContainerManager {
         try await container.provision()
 
         return container
+    }
+
+    ///
+    /// Stops a Nextcloud server container by its identifier and deletes all of its data.
+    ///
+    /// Because the container was created with `AutoRemove`, stopping it is sufficient —
+    /// Docker removes it automatically once it exits. The call is idempotent: containers
+    /// that are already stopped or have already been removed do not cause an error.
+    ///
+    /// - Parameters:
+    ///     - id: The Docker container identifier returned by ``deploy(configuration:)``.
+    ///
+    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop
+    ///     is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if
+    ///     it cannot be launched, or a ``DockerClientError`` for any API-level failure.
+    ///
+    public static func delete(_ id: String) async throws {
+        let client = try await makeDockerEngineClient()
+
+        // Acceptable status codes:
+        //   204 – successfully stopped
+        //   304 – container was already stopped (already auto-removed)
+        //   404 – container no longer exists (already removed)
+        let response = try await client.post(path: "/containers/\(id)/stop")
+
+        guard [204, 304, 404].contains(response.statusCode) else {
+            let message = String(data: response.body, encoding: .utf8) ?? "<no body>"
+            throw DockerClientError.unexpectedStatusCode(response.statusCode, message)
+        }
     }
 }
