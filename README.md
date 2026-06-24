@@ -2,6 +2,7 @@
 
 [![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fi2h3%2Fnextcloud-container-manager%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/i2h3/nextcloud-container-manager)
 [![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fi2h3%2Fnextcloud-container-manager%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/i2h3/nextcloud-container-manager)
+[![REUSE](https://api.reuse.software/badge/github.com/i2h3/nextcloud-container-manager)](https://api.reuse.software/info/github.com/i2h3/nextcloud-container-manager)
 
 Control the local deployment of Nextcloud Docker containers programmatically from Swift.
 

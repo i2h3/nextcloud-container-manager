@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Iva Horn
+// SPDX-License-Identifier: MIT
+
 ///
 /// A subset of the response body returned by `GET /exec/{id}/json`.
 ///

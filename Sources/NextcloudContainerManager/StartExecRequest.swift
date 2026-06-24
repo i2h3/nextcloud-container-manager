@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Iva Horn
+// SPDX-License-Identifier: MIT
+
 ///
 /// The request body sent to `POST /exec/{id}/start`.
 ///

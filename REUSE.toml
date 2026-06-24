@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 Iva Horn
+# SPDX-License-Identifier: MIT
+
+version = 1
+
+[[annotations]]
+path = [
+    "**/*.json",
+    ".gitignore",
+    ".swift-version",
+    ".swiftformat",
+    "AGENTS.md",
+    "README.md",
+]
+SPDX-FileCopyrightText = "2026 Iva Horn"
+SPDX-License-Identifier = "MIT"

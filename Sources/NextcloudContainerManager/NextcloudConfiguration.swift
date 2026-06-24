@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Iva Horn
+// SPDX-License-Identifier: MIT
+
 ///
 /// A configuration to set up a Nextcloud container with.
 ///

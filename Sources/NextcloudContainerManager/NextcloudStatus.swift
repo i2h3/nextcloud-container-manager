@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Iva Horn
+// SPDX-License-Identifier: MIT
+
 ///
 /// A subset of the JSON returned by the Nextcloud `status.php` endpoint.
 ///
