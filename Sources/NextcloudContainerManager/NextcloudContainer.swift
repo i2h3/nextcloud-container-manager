@@ -39,12 +39,10 @@ public struct NextcloudContainer: Identifiable, Sendable {
     ///
     /// Runs all post-deployment provisioning steps defined in the configuration.
     ///
-    /// Currently this waits for the Nextcloud instance to finish its initial
-    /// installation and then disables the apps listed in
-    /// ``NextcloudConfiguration/disabledApps``.
+    /// After waiting for the Nextcloud instance to finish its initial installation, this disables the apps listed in ``NextcloudConfiguration/disabledApps``, enables the apps listed in ``NextcloudConfiguration/enabledApps`` (installing them first when necessary), and creates the users listed in ``NextcloudConfiguration/users``.
     ///
     func provision() async throws {
-        guard !configuration.disabledApps.isEmpty else {
+        guard !configuration.disabledApps.isEmpty || !configuration.enabledApps.isEmpty || !configuration.users.isEmpty else {
             return
         }
 
@@ -53,6 +51,19 @@ public struct NextcloudContainer: Identifiable, Sendable {
         for app in configuration.disabledApps {
             // A single broken app must not interrupt the remaining provisioning steps, so failures are intentionally ignored here.
             try? await disableApp(app)
+        }
+
+        for app in configuration.enabledApps {
+            // Enabling fails when the app is not present yet, in which case it is installed from the app store, which also enables it.
+            do {
+                try await enableApp(app)
+            } catch {
+                try await addApp(app)
+            }
+        }
+
+        for user in configuration.users {
+            try await addUser(user)
         }
     }
 
@@ -81,7 +92,7 @@ public struct NextcloudContainer: Identifiable, Sendable {
                 // Nextcloud is not ready yet – retry after a short delay.
             }
 
-            try await Task.sleep(for: .seconds(2))
+            try await Task.sleep(for: .milliseconds(500))
         }
 
         throw DockerClientError.timeout
@@ -232,14 +243,14 @@ public struct NextcloudContainer: Identifiable, Sendable {
             let info = try JSONDecoder().decode(ExecInspectResponse.self, from: inspectResponse.body)
 
             if !info.Running {
-                guard info.ExitCode == 0 else {
-                    throw DockerClientError.commandFailed(command: arguments, exitCode: info.ExitCode)
+                if let exitCode = info.ExitCode, exitCode != 0 {
+                    throw DockerClientError.commandFailed(command: arguments, exitCode: exitCode)
                 }
 
                 return
             }
 
-            try await Task.sleep(for: .seconds(1))
+            try await Task.sleep(for: .milliseconds(100))
         }
 
         throw DockerClientError.timeout

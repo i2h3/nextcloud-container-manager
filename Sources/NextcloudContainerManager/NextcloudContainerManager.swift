@@ -111,8 +111,14 @@ public enum NextcloudContainerManager {
             client: client
         )
 
-        // 5. Run post-deployment provisioning (wait for readiness, disable apps).
-        try await container.provision()
+        // 5. Run post-deployment provisioning, tearing the container down again when it fails so a half-provisioned instance is not leaked.
+        do {
+            try await container.provision()
+        } catch {
+            try? await container.delete()
+
+            throw error
+        }
 
         return container
     }

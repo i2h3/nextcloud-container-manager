@@ -13,7 +13,23 @@ public struct NextcloudConfiguration: Sendable {
     ///
     /// App identifiers to disable after the Nextcloud instance is ready.
     ///
+    /// Each identifier is passed to ``NextcloudContainer/disableApp(_:)`` during provisioning.
+    ///
     public let disabledApps: [String]
+
+    ///
+    /// App identifiers to enable after the Nextcloud instance is ready, installing them first when they are not present yet.
+    ///
+    /// Each identifier is passed to ``NextcloudContainer/enableApp(_:)`` during provisioning and, when the app is not installed yet, additionally to ``NextcloudContainer/addApp(_:)``. Apps that are enabled by default and not listed in ``disabledApps`` are left as they are.
+    ///
+    public let enabledApps: [String]
+
+    ///
+    /// Identifiers of additional users to create after the Nextcloud instance is ready.
+    ///
+    /// Each identifier is passed to ``NextcloudContainer/addUser(_:)`` during provisioning, which reuses the identifier as the account password.
+    ///
+    public let users: [String]
 
     ///
     /// Create a new configuration.
@@ -21,9 +37,13 @@ public struct NextcloudConfiguration: Sendable {
     /// - Parameters:
     ///     - tag: Always `latest` by default, if not specified differently.
     ///     - disabledApps: App identifiers to disable after deployment. Empty by default.
+    ///     - enabledApps: App identifiers to enable, and install when necessary, after deployment. Empty by default.
+    ///     - users: Identifiers of additional users to create after deployment. Empty by default.
     ///
-    public init(tag: String = "latest", disabledApps: [String] = []) {
+    public init(tag: String = "latest", disabledApps: [String] = [], enabledApps: [String] = [], users: [String] = []) {
         self.tag = tag
         self.disabledApps = disabledApps
+        self.enabledApps = enabledApps
+        self.users = users
     }
 }
