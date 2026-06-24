@@ -11,4 +11,6 @@ struct CreateExecRequest: Encodable {
     let User: String
     /// The working directory for the command.
     let WorkingDir: String
+    /// Environment variables in `VAR=value` form. Omitted from the request when `nil`.
+    let Env: [String]?
 }

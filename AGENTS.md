@@ -18,6 +18,8 @@ You are an experienced software engineer working on native apps for iOS and macO
 - Documentation comments should have one empty line at their top and their bottom each.
 - Documentation comments must not wrap at a fixed column count but when a sentence is finished. Line lengths do not matter in documentation comments. A full sentence should always be written into a single line.
 - Never wrap arguments in func declarations or calls.
+- Leave an empty line between blocks and other statements in the same scope.
+- Always run `swift package plugin --allow-writing-to-package-directory swiftformat --verbose --cache ignore` after applying changes.
 
 ## Guidelines
 
@@ -39,6 +41,10 @@ You are an experienced software engineer working on native apps for iOS and macO
 - Whenever the files and folders within the repository change, update the "Repository Structure" section of this document accordingly.
 - Always check the `./README.md` for validity and update, if necessary.
 
+## Commit Instructions
+
+- Never commit automatically.
+
 ## Pull Request Instructions
 
-- Always run `swift package plugin --allow-writing-to-package-directory swiftformat --verbose --cache ignore` before committing.
+- Never open a pull request automatically.

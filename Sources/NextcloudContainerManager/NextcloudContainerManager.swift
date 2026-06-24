@@ -88,14 +88,17 @@ public enum NextcloudContainerManager {
 
         // 3. Create the container.
         let createResponse = try await client.post(path: "/containers/create", body: requestBody)
+
         guard createResponse.statusCode == 201 else {
             let message = String(data: createResponse.body, encoding: .utf8) ?? "<no body>"
             throw DockerClientError.unexpectedStatusCode(createResponse.statusCode, message)
         }
+
         let created = try JSONDecoder().decode(CreateContainerResponse.self, from: createResponse.body)
 
         // 4. Start the container.
         let startResponse = try await client.post(path: "/containers/\(created.Id)/start")
+
         guard startResponse.statusCode == 204 else {
             let message = String(data: startResponse.body, encoding: .utf8) ?? "<no body>"
             throw DockerClientError.unexpectedStatusCode(startResponse.statusCode, message)

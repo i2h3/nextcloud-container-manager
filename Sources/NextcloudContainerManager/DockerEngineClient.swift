@@ -63,17 +63,21 @@ struct DockerEngineClient {
 
     private func send(method: String, path: String, body: Data?) async throws -> (statusCode: Int, body: Data) {
         var requestText = "\(method) \(path) HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n"
+
         if let body {
             requestText += "Content-Type: application/json\r\nContent-Length: \(body.count)\r\n"
         }
+
         requestText += "\r\n"
 
         // Build as a let so it is safe to capture in @Sendable closures.
         let requestData: Data = {
             var d = Data(requestText.utf8)
+
             if let body {
                 d.append(body)
             }
+
             return d
         }()
 
@@ -102,9 +106,11 @@ private func dockerSocketRequest(
 ) throws -> (statusCode: Int, body: Data) {
     // ── 1. Open a Unix-domain stream socket ─────────────────────────────────
     let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+
     guard fd >= 0 else {
         throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
     }
+
     defer { close(fd) }
 
     // ── 2. Connect to the Docker socket path ─────────────────────────────────
@@ -120,32 +126,39 @@ private func dockerSocketRequest(
             connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
         }
     }
+
     guard connectResult == 0 else {
         throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
     }
 
     // ── 3. Send the full HTTP request ────────────────────────────────────────
     var totalSent = 0
+
     while totalSent < requestData.count {
         let sent = requestData.withUnsafeBytes { ptr in
             send(fd, ptr.baseAddress!.advanced(by: totalSent), ptr.count - totalSent, 0)
         }
+
         guard sent > 0 else {
             throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
         }
+
         totalSent += sent
     }
 
     // ── 4. Read until the server closes the connection (Connection: close) ───
     var responseData = Data()
     var buffer = [UInt8](repeating: 0, count: 8192)
+
     while true {
         let n = buffer.withUnsafeMutableBytes { ptr in
             recv(fd, ptr.baseAddress!, ptr.count, 0)
         }
+
         if n <= 0 {
             break
         }
+
         responseData.append(buffer, count: n)
     }
 
@@ -153,6 +166,7 @@ private func dockerSocketRequest(
     guard let parsed = parseHTTPResponse(responseData) else {
         throw DockerClientError.invalidResponse
     }
+
     return parsed
 }
 
@@ -173,6 +187,7 @@ private func parseHTTPResponse(_ data: Data) -> (statusCode: Int, body: Data)? {
 
     // "HTTP/1.1 201 Created"
     let parts = statusLine.split(separator: " ", maxSplits: 2)
+
     guard parts.count >= 2, let statusCode = Int(parts[1]) else {
         return nil
     }
@@ -195,6 +210,7 @@ private func decodeChunked(_ data: Data) -> Data {
         }
 
         let sizeHex = data[position ..< crlfRange.lowerBound]
+
         guard
             let sizeString = String(data: sizeHex, encoding: .ascii),
             let chunkSize = Int(sizeString.trimmingCharacters(in: .whitespaces), radix: 16),
@@ -204,9 +220,11 @@ private func decodeChunked(_ data: Data) -> Data {
         }
 
         let chunkStart = crlfRange.upperBound
+
         guard let chunkEnd = data.index(chunkStart, offsetBy: chunkSize, limitedBy: data.endIndex) else {
             break
         }
+
         result.append(data[chunkStart ..< chunkEnd])
         position = data.index(chunkEnd, offsetBy: 2, limitedBy: data.endIndex) ?? data.endIndex
     }

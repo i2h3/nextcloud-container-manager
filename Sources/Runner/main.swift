@@ -7,9 +7,11 @@ import NextcloudContainerManager
 /// Parse an optional --tag <value> argument, e.g.: swift run Runner --tag 30
 let tag: String = {
     let args = CommandLine.arguments
+
     if let idx = args.firstIndex(of: "--tag"), idx + 1 < args.count {
         return args[idx + 1]
     }
+
     return "latest"
 }()
 
@@ -20,6 +22,7 @@ let semaphore = DispatchSemaphore(value: 0)
 
 Task.detached {
     defer { semaphore.signal() }
+
     do {
         print("Deploying nextcloud:\(tag)…")
         let container = try await NextcloudContainerManager.deploy(
