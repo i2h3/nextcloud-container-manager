@@ -29,18 +29,20 @@ let container = try await NextcloudContainerManager.deploy(
 // The instance is live now; log in as `admin` / `admin` or hit its HTTP port directly.
 print("Nextcloud is ready at http://localhost:\(container.port)")
 
-// Provision the fixtures your tests need.
-try await container.addUser("alice")
+// Provision the fixtures your tests need, keyed by the container id.
+try await NextcloudContainerManager.addUser("alice", inContainer: container.id)
 
 // Tear everything down — stopping the container discards all of its data.
-try await container.delete()
+try await NextcloudContainerManager.delete(container.id)
 ```
 
 ### Managing the server
 
-Once a container is running you manage its apps and users through ``NextcloudContainer``.
-Use ``NextcloudContainer/addApp(_:)``, ``NextcloudContainer/removeApp(_:)``, ``NextcloudContainer/enableApp(_:)`` and ``NextcloudContainer/disableApp(_:)`` for apps, and ``NextcloudContainer/addUser(_:)``, ``NextcloudContainer/removeUser(_:)``, ``NextcloudContainer/enableUser(_:)`` and ``NextcloudContainer/disableUser(_:)`` for users.
-Every one of these maps to an `occ` command executed inside the container, so a failure surfaces as a thrown error rather than a silent no-op.
+``NextcloudContainerManager/deploy(configuration:)`` returns a ``NextcloudContainer`` — a lightweight value carrying the container's ``NextcloudContainer/id`` and the host ``NextcloudContainer/port`` the server is reachable on.
+
+Every management operation is a stateless function on ``NextcloudContainerManager`` keyed by the container identifier, so callers that only persist an id — for example a Model Context Protocol server — can use them without holding the ``NextcloudContainer`` value.
+Use ``NextcloudContainerManager/addApp(_:inContainer:)``, ``NextcloudContainerManager/removeApp(_:inContainer:)``, ``NextcloudContainerManager/enableApp(_:inContainer:)`` and ``NextcloudContainerManager/disableApp(_:inContainer:)`` for apps, and ``NextcloudContainerManager/addUser(_:inContainer:)``, ``NextcloudContainerManager/removeUser(_:inContainer:)``, ``NextcloudContainerManager/enableUser(_:inContainer:)`` and ``NextcloudContainerManager/disableUser(_:inContainer:)`` for users.
+Each maps to an `occ` command executed inside the container, so a failure surfaces as a thrown error rather than a silent no-op.
 
 ## Topics
 

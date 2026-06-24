@@ -42,7 +42,7 @@ Task.detached {
         print("\nPress Enter to stop and remove the container…")
         _ = readLine()
         print("Stopping…")
-        try await container.delete()
+        try await NextcloudContainerManager.delete(container.id)
         print("Done.")
     } catch {
         print("Error: \(error)")

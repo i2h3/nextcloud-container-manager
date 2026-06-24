@@ -13,21 +13,21 @@ public struct NextcloudConfiguration: Sendable {
     ///
     /// App identifiers to disable after the Nextcloud instance is ready.
     ///
-    /// Each identifier is passed to ``NextcloudContainer/disableApp(_:)`` during provisioning.
+    /// Each identifier is passed to ``NextcloudContainerManager/disableApp(_:inContainer:)`` during provisioning.
     ///
     public let disabledApps: [String]
 
     ///
     /// App identifiers to enable after the Nextcloud instance is ready, installing them first when they are not present yet.
     ///
-    /// Each identifier is passed to ``NextcloudContainer/enableApp(_:)`` during provisioning and, when the app is not installed yet, additionally to ``NextcloudContainer/addApp(_:)``. Apps that are enabled by default and not listed in ``disabledApps`` are left as they are.
+    /// Each identifier is passed to ``NextcloudContainerManager/enableApp(_:inContainer:)`` during provisioning and, when the app is not installed yet, additionally to ``NextcloudContainerManager/addApp(_:inContainer:)``. Apps that are enabled by default and not listed in ``disabledApps`` are left as they are.
     ///
     public let enabledApps: [String]
 
     ///
     /// Identifiers of additional users to create after the Nextcloud instance is ready.
     ///
-    /// Each identifier is passed to ``NextcloudContainer/addUser(_:)`` during provisioning, which reuses the identifier as the account password.
+    /// Each identifier is passed to ``NextcloudContainerManager/addUser(_:inContainer:)`` during provisioning, which reuses the identifier as the account password.
     ///
     public let users: [String]
 
