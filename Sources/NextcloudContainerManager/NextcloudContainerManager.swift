@@ -53,13 +53,13 @@ public enum NextcloudContainerManager {
     /// installed or cannot be launched, a ``NextcloudContainerManagerError`` is thrown.
     ///
     /// - Parameters:
-    ///     - configuration: Deployment options. Defaults to ``NextcloudConfiguration/init()``.
+    ///     - configuration: Deployment options. Defaults to ``NextcloudConfiguration/init(tag:disabledApps:)``.
     ///
     /// - Returns: A handle for the running container.
     ///
     /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop
     ///     is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if
-    ///     it cannot be launched, or a ``DockerClientError`` for any API-level failure.
+    ///     it cannot be launched, or a `DockerClientError` for any API-level failure.
     ///
     public static func deploy(configuration: NextcloudConfiguration = NextcloudConfiguration()) async throws -> NextcloudContainer {
         let client = try await makeDockerEngineClient()
@@ -129,7 +129,7 @@ public enum NextcloudContainerManager {
     ///
     /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop
     ///     is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if
-    ///     it cannot be launched, or a ``DockerClientError`` for any API-level failure.
+    ///     it cannot be launched, or a `DockerClientError` for any API-level failure.
     ///
     public static func delete(_ id: String) async throws {
         let client = try await makeDockerEngineClient()

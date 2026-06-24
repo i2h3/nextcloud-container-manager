@@ -95,7 +95,7 @@ public struct NextcloudContainer: Identifiable, Sendable {
     /// - Parameters:
     ///     - app: The app identifier expected by the `occ` command line.
     ///
-    /// - Throws: A ``DockerClientError`` if the command cannot be run or exits with a non-zero status.
+    /// - Throws: A `DockerClientError` if the command cannot be run or exits with a non-zero status.
     ///
     public func addApp(_ app: String) async throws {
         try await runOCC(["app:install", app])
@@ -107,7 +107,7 @@ public struct NextcloudContainer: Identifiable, Sendable {
     /// - Parameters:
     ///     - app: The app identifier expected by the `occ` command line.
     ///
-    /// - Throws: A ``DockerClientError`` if the command cannot be run or exits with a non-zero status.
+    /// - Throws: A `DockerClientError` if the command cannot be run or exits with a non-zero status.
     ///
     public func removeApp(_ app: String) async throws {
         try await runOCC(["app:remove", app])
@@ -119,7 +119,7 @@ public struct NextcloudContainer: Identifiable, Sendable {
     /// - Parameters:
     ///     - app: The app identifier expected by the `occ` command line.
     ///
-    /// - Throws: A ``DockerClientError`` if the command cannot be run or exits with a non-zero status.
+    /// - Throws: A `DockerClientError` if the command cannot be run or exits with a non-zero status.
     ///
     public func enableApp(_ app: String) async throws {
         try await runOCC(["app:enable", app])
@@ -131,7 +131,7 @@ public struct NextcloudContainer: Identifiable, Sendable {
     /// - Parameters:
     ///     - app: The app identifier expected by the `occ` command line.
     ///
-    /// - Throws: A ``DockerClientError`` if the command cannot be run or exits with a non-zero status.
+    /// - Throws: A `DockerClientError` if the command cannot be run or exits with a non-zero status.
     ///
     public func disableApp(_ app: String) async throws {
         try await runOCC(["app:disable", app])
@@ -148,7 +148,7 @@ public struct NextcloudContainer: Identifiable, Sendable {
     /// - Parameters:
     ///     - user: The user identifier expected by the `occ` command line.
     ///
-    /// - Throws: A ``DockerClientError`` if the command cannot be run or exits with a non-zero status.
+    /// - Throws: A `DockerClientError` if the command cannot be run or exits with a non-zero status.
     ///
     public func addUser(_ user: String) async throws {
         try await runOCC(["user:add", "--password-from-env", user], environment: ["OC_PASS=\(user)"])
@@ -160,7 +160,7 @@ public struct NextcloudContainer: Identifiable, Sendable {
     /// - Parameters:
     ///     - user: The user identifier expected by the `occ` command line.
     ///
-    /// - Throws: A ``DockerClientError`` if the command cannot be run or exits with a non-zero status.
+    /// - Throws: A `DockerClientError` if the command cannot be run or exits with a non-zero status.
     ///
     public func removeUser(_ user: String) async throws {
         try await runOCC(["user:delete", user])
@@ -172,7 +172,7 @@ public struct NextcloudContainer: Identifiable, Sendable {
     /// - Parameters:
     ///     - user: The user identifier expected by the `occ` command line.
     ///
-    /// - Throws: A ``DockerClientError`` if the command cannot be run or exits with a non-zero status.
+    /// - Throws: A `DockerClientError` if the command cannot be run or exits with a non-zero status.
     ///
     public func enableUser(_ user: String) async throws {
         try await runOCC(["user:enable", user])
@@ -184,7 +184,7 @@ public struct NextcloudContainer: Identifiable, Sendable {
     /// - Parameters:
     ///     - user: The user identifier expected by the `occ` command line.
     ///
-    /// - Throws: A ``DockerClientError`` if the command cannot be run or exits with a non-zero status.
+    /// - Throws: A `DockerClientError` if the command cannot be run or exits with a non-zero status.
     ///
     public func disableUser(_ user: String) async throws {
         try await runOCC(["user:disable", user])
@@ -201,7 +201,7 @@ public struct NextcloudContainer: Identifiable, Sendable {
     ///     - arguments: The `occ` subcommand and its arguments, e.g. `["app:install", "calendar"]`.
     ///     - environment: Environment variables in `VAR=value` form to expose to the command, e.g. `["OC_PASS=secret"]`.
     ///
-    /// - Throws: ``DockerClientError/unexpectedStatusCode(_:_:)`` if the Docker Engine API rejects the request, ``DockerClientError/timeout`` if the command does not finish within 30 seconds, or ``DockerClientError/commandFailed(command:exitCode:)`` if it exits with a non-zero status.
+    /// - Throws: `DockerClientError.unexpectedStatusCode` if the Docker Engine API rejects the request, `DockerClientError.timeout` if the command does not finish within 30 seconds, or `DockerClientError.commandFailed` if it exits with a non-zero status.
     ///
     private func runOCC(_ arguments: [String], environment: [String] = []) async throws {
         // 1. Create the exec instance.
