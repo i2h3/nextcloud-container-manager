@@ -7,6 +7,14 @@ You are an experienced software engineer working on native apps for iOS and macO
 - `Sources/` contains the Swift source code per target.
 - `Tests/` contains the automated tests per target.
 
+The `NextcloudContainerManager` library target groups its source files into folders by concern (one level deep):
+
+- `Manager/` holds the `NextcloudContainerManager` enum and its feature extensions (`+AppManagement`, `+UserManagement`, `+CommandExecution`, `+Provisioning`, `+HighPerformanceBackend`), one feature group per file.
+- `PublicTypes/` holds the remaining public types (`NextcloudConfiguration`, `NextcloudContainer`, `NextcloudContainerManagerError`).
+- `DockerClient/` holds the Docker Engine client and its supporting utilities (`DockerEngineClient`, `DockerClientError`, `findFreePort`).
+- `Requests/` and `Responses/` hold the Docker Engine and Nextcloud request and response body models.
+- `Documentation.docc/` holds the DocC catalog.
+
 ## Code Style
 
 - This project is set up to use SwiftFormat.
@@ -17,6 +25,7 @@ You are an experienced software engineer working on native apps for iOS and macO
 - Documentation comments should also explain how the documented type or property relates to other symbols in the project.
 - Documentation comments should have one empty line at their top and their bottom each.
 - Documentation comments must not wrap at a fixed column count but when a sentence is finished. Line lengths do not matter in documentation comments. A full sentence should always be written into a single line.
+- Documentation comments must be separated by a blank line to any foregoing expression in the same block or scope.
 - Never wrap arguments in func declarations or calls.
 - Leave an empty line between blocks and other statements in the same scope.
 - Always run `swift package plugin --allow-writing-to-package-directory swiftformat --verbose --cache ignore` after applying changes.

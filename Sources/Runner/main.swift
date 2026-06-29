@@ -4,7 +4,9 @@
 import Foundation
 import NextcloudContainerManager
 
-/// Parse an optional --tag <value> argument, e.g.: swift run Runner --tag 30
+///
+/// Parse an optional `--tag <value>` argument, for example `swift run Runner --tag 30`.
+///
 let tag: String = {
     let args = CommandLine.arguments
 
@@ -15,16 +17,19 @@ let tag: String = {
     return "latest"
 }()
 
-/// Task.detached avoids inheriting the @MainActor isolation of top-level
-/// main.swift code, keeping the cooperative thread pool free while we block
-/// on readLine() below.
+///
+/// `Task.detached` avoids inheriting the `@MainActor` isolation of top-level `main.swift` code, keeping the cooperative thread pool free while we block on `readLine()` below.
+///
 let semaphore = DispatchSemaphore(value: 0)
 
 Task.detached {
-    defer { semaphore.signal() }
+    defer {
+        semaphore.signal()
+    }
 
     do {
         print("Deploying nextcloud:\(tag)…")
+
         let container = try await NextcloudContainerManager.deploy(
             configuration: NextcloudConfiguration(
                 tag: tag,
@@ -36,6 +41,7 @@ Task.detached {
                 ]
             )
         )
+
         print("Container ready")
         print("  ID:  \(container.id.prefix(12))")
         print("  URL: http://localhost:\(container.port)")

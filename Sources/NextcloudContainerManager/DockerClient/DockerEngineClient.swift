@@ -4,14 +4,14 @@
 import Foundation
 
 ///
-/// Minimal HTTP/1.1 client that speaks to the Docker Engine API
-/// over the Unix domain socket that Docker Desktop exposes on macOS.
+/// Minimal HTTP/1.1 client that speaks to the Docker Engine API over the Unix domain socket that Docker Desktop exposes on macOS.
 ///
-/// Uses POSIX sockets directly; `NWConnection` cannot drive a Unix-domain
-/// socket with TCP parameters on macOS and fails with `ENETDOWN`.
+/// Uses POSIX sockets directly; `NWConnection` cannot drive a Unix-domain socket with TCP parameters on macOS and fails with `ENETDOWN`.
 ///
 struct DockerEngineClient {
+    ///
     /// The file-system path to the Docker Engine Unix domain socket.
+    ///
     let socketPath: String
 
     ///

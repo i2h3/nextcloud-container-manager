@@ -4,15 +4,12 @@
 import Darwin
 
 ///
-/// Ask the kernel for a free TCP port by binding to port 0, reading back the
-/// assigned port, and then immediately releasing the socket.
+/// Ask the kernel for a free TCP port by binding to port 0, reading back the assigned port, and then immediately releasing the socket.
 ///
-/// There is a small TOCTOU window between releasing the socket and Docker
-/// binding to the port, which is acceptable for test-container use.
+/// There is a small TOCTOU window between releasing the socket and Docker binding to the port, which is acceptable for test-container use.
 ///
 /// - Returns: A free port number on the local host.
-/// - Throws: ``DockerClientError/couldNotFindFreePort`` when the kernel does
-///   not grant a socket or assign a port.
+/// - Throws: ``DockerClientError/couldNotFindFreePort`` when the kernel does not grant a socket or assign a port.
 ///
 func findFreePort() throws -> UInt16 {
     let sock = Darwin.socket(AF_INET, SOCK_STREAM, 0)

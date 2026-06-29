@@ -10,6 +10,8 @@ Control the local deployment of Nextcloud Docker containers programmatically fro
 
 Talk to the [Docker Engine API](https://docs.docker.com/reference/api/engine/) on macOS to deploy ephemeral Nextcloud containers for running automated tests against them.
 
+It can optionally enable the High Performance Backend for Files (`notify_push`) so connected clients receive websocket push notifications instead of polling.
+
 ## Who is this for?
 
 This package targets developers working on native Nextcloud client apps.
