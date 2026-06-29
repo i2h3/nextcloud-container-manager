@@ -44,6 +44,8 @@ Every management operation is a stateless function on ``NextcloudContainerManage
 Use ``NextcloudContainerManager/addApp(_:inContainer:)``, ``NextcloudContainerManager/removeApp(_:inContainer:)``, ``NextcloudContainerManager/enableApp(_:inContainer:)`` and ``NextcloudContainerManager/disableApp(_:inContainer:)`` for apps, and ``NextcloudContainerManager/addUser(_:inContainer:)``, ``NextcloudContainerManager/removeUser(_:inContainer:)``, ``NextcloudContainerManager/enableUser(_:inContainer:)`` and ``NextcloudContainerManager/disableUser(_:inContainer:)`` for users.
 Each maps to an `occ` command executed inside the container, so a failure surfaces as a thrown error rather than a silent no-op.
 
+When a test fails, ``NextcloudContainerManager/logFile(inContainer:)`` copies the Nextcloud application log (`data/nextcloud.log`) out of the container into a temporary file and returns its URL — a point-in-time snapshot the same id-only callers can read.
+
 ### High Performance Backend for Files
 
 Set ``NextcloudConfiguration/pushNotifications`` to `true` to enable the High Performance Backend so connected clients receive websocket push notifications instead of polling.

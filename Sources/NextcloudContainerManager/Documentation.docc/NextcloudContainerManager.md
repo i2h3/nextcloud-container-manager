@@ -20,3 +20,7 @@
 - ``removeUser(_:inContainer:)``
 - ``enableUser(_:inContainer:)``
 - ``disableUser(_:inContainer:)``
+
+### Reading logs
+
+- ``logFile(inContainer:)``
