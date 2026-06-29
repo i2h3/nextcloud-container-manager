@@ -108,8 +108,10 @@ public enum NextcloudContainerManager {
             labels = [deploymentLabelKey: deployment]
         }
 
+        let nextcloudImage = "nextcloud:\(configuration.tag)"
+
         let requestBody = CreateContainerRequest(
-            Image: "nextcloud:\(configuration.tag)",
+            Image: nextcloudImage,
             Env: environment,
             ExposedPorts: exposedPorts,
             HostConfig: .init(AutoRemove: true, PortBindings: portBindings, NetworkMode: networkMode),
@@ -117,10 +119,13 @@ public enum NextcloudContainerManager {
             NetworkingConfig: nil
         )
 
-        // 4. Create and start the container, then provision it, rolling back the container and any supporting infrastructure if a later step fails so nothing is leaked.
+        // 4. Pull the Nextcloud image, then create and start the container and provision it, rolling back the container and any supporting infrastructure if a later step fails so nothing is leaked.
         var createdId: String?
 
         do {
+            // The create endpoint never pulls images, so the Nextcloud image is pulled explicitly before the container is created.
+            try await pullImage(nextcloudImage, using: client)
+
             let createResponse = try await client.post(path: "/containers/create", body: requestBody)
 
             guard createResponse.statusCode == 201 else {

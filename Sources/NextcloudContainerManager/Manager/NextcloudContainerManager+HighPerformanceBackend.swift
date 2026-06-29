@@ -142,7 +142,7 @@ extension NextcloudContainerManager {
     ///
     /// Pulls an image so it is available locally, because `POST /containers/create` never pulls missing images itself.
     ///
-    /// The Docker Engine streams progress and closes the connection when the pull finishes. A pull error is reported inside that stream rather than as an HTTP status, so it surfaces later as a missing-image failure from container creation.
+    /// The Docker Engine streams progress and closes the connection when the pull finishes. A pull failure is reported as an error entry inside that stream rather than as an HTTP status, so the newline-delimited messages are inspected and ``DockerClientError/imagePullFailed(image:message:)`` is thrown as soon as one carries an error, instead of letting it surface later as a missing-image failure from container creation.
     ///
     /// - Parameters:
     ///     - image: The image reference, optionally including a tag (e.g. `redis:7-alpine`).
@@ -158,6 +158,19 @@ extension NextcloudContainerManager {
         guard response.statusCode == 200 else {
             let message = String(data: response.body, encoding: .utf8) ?? "<no body>"
             throw DockerClientError.unexpectedStatusCode(response.statusCode, message)
+        }
+
+        // A pull failure is reported as an error entry inside the streamed body rather than as an HTTP status, so the
+        // newline-delimited progress messages are inspected to fail here instead of later from container creation.
+        for line in response.body.split(separator: UInt8(ascii: "\n")) {
+            guard
+                let message = try? JSONDecoder().decode(ImagePullMessage.self, from: Data(line)),
+                let error = message.error
+            else {
+                continue
+            }
+
+            throw DockerClientError.imagePullFailed(image: image, message: error)
         }
     }
 

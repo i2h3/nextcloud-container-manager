@@ -21,6 +21,11 @@ enum DockerClientError: Error {
     case unexpectedStatusCode(Int, String)
 
     ///
+    /// Pulling an image from its registry failed. The associated values are the image reference and the error the Docker Engine reported inside the pull stream.
+    ///
+    case imagePullFailed(image: String, message: String)
+
+    ///
     /// A command executed inside the container exited with a non-zero status.
     ///
     case commandFailed(command: [String], exitCode: Int)
