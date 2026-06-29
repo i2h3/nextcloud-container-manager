@@ -32,6 +32,13 @@ public struct NextcloudConfiguration: Sendable {
     public let users: [String]
 
     ///
+    /// Whether to enable the High Performance Backend for Files so connected clients receive websocket push notifications instead of polling.
+    ///
+    /// When `true`, ``NextcloudContainerManager/deploy(configuration:)`` additionally deploys a Redis sidecar on a dedicated network, configures the Nextcloud instance to use it, installs the `notify_push` app, launches its push daemon inside the container and registers it with the server. The host port the push endpoint is reachable on is reported as ``NextcloudContainer/pushPort``. Tearing the deployment down with ``NextcloudContainerManager/delete(_:)`` removes the sidecar and network as well. Disabled by default.
+    ///
+    public let pushNotifications: Bool
+
+    ///
     /// Create a new configuration.
     ///
     /// - Parameters:
@@ -39,11 +46,13 @@ public struct NextcloudConfiguration: Sendable {
     ///     - disabledApps: App identifiers to disable after deployment. Empty by default.
     ///     - enabledApps: App identifiers to enable, and install when necessary, after deployment. Empty by default.
     ///     - users: Identifiers of additional users to create after deployment. Empty by default.
+    ///     - pushNotifications: Whether to enable the High Performance Backend for Files. Disabled by default.
     ///
-    public init(tag: String = "latest", disabledApps: [String] = [], enabledApps: [String] = [], users: [String] = []) {
+    public init(tag: String = "latest", disabledApps: [String] = [], enabledApps: [String] = [], users: [String] = [], pushNotifications: Bool = false) {
         self.tag = tag
         self.disabledApps = disabledApps
         self.enabledApps = enabledApps
         self.users = users
+        self.pushNotifications = pushNotifications
     }
 }

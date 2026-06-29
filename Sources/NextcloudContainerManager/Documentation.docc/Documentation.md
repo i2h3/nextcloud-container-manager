@@ -44,6 +44,23 @@ Every management operation is a stateless function on ``NextcloudContainerManage
 Use ``NextcloudContainerManager/addApp(_:inContainer:)``, ``NextcloudContainerManager/removeApp(_:inContainer:)``, ``NextcloudContainerManager/enableApp(_:inContainer:)`` and ``NextcloudContainerManager/disableApp(_:inContainer:)`` for apps, and ``NextcloudContainerManager/addUser(_:inContainer:)``, ``NextcloudContainerManager/removeUser(_:inContainer:)``, ``NextcloudContainerManager/enableUser(_:inContainer:)`` and ``NextcloudContainerManager/disableUser(_:inContainer:)`` for users.
 Each maps to an `occ` command executed inside the container, so a failure surfaces as a thrown error rather than a silent no-op.
 
+### High Performance Backend for Files
+
+Set ``NextcloudConfiguration/pushNotifications`` to `true` to enable the High Performance Backend so connected clients receive websocket push notifications instead of polling.
+
+```swift
+let container = try await NextcloudContainerManager.deploy(
+    configuration: NextcloudConfiguration(pushNotifications: true)
+)
+
+// The websocket push endpoint is reachable at http://localhost:<pushPort>.
+print("Push endpoint on port \(container.pushPort!)")
+```
+
+The `notify_push` app requires a Redis server, so the deployment additionally spins up a Redis sidecar on a dedicated network, configures the Nextcloud instance to use it, installs the app, launches its push daemon inside the container and registers it with the server.
+The host port the endpoint is reachable on is reported as ``NextcloudContainer/pushPort``, and clients discover it automatically through the Nextcloud capabilities API.
+``NextcloudContainerManager/delete(_:)`` removes the sidecar and network along with the container.
+
 ## Topics
 
 ### Essentials

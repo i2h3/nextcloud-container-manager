@@ -25,4 +25,11 @@ public struct NextcloudContainer: Identifiable, Sendable {
     /// The Nextcloud server is reachable at `http://localhost:<port>`.
     ///
     public let port: UInt
+
+    ///
+    /// The host port the websocket push endpoint is reachable on, or `nil` when ``NextcloudConfiguration/pushNotifications`` was not enabled.
+    ///
+    /// When set, the High Performance Backend for Files is registered with the server at `http://localhost:<pushPort>` and clients discover it automatically through the Nextcloud capabilities API.
+    ///
+    public let pushPort: UInt?
 }
