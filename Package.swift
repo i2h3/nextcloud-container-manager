@@ -9,7 +9,7 @@ import PackageDescription
 let package = Package(
     name: "NextcloudContainerManager",
     platforms: [
-        .macOS(.v26),
+        .macOS(.v12),
     ],
     products: [
         .library(

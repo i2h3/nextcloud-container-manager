@@ -70,7 +70,7 @@ extension NextcloudContainerManager {
                 // Nextcloud is not ready yet – retry after a short delay.
             }
 
-            try await Task.sleep(for: .milliseconds(500))
+            try await Task.sleep(nanoseconds: 500_000_000)
         }
 
         throw DockerClientError.timeout

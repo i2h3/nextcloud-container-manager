@@ -35,7 +35,7 @@ public enum NextcloudContainerManager {
             let deadline = Date.now.addingTimeInterval(10)
 
             while !FileManager.default.fileExists(atPath: socketPath), Date.now < deadline {
-                try await Task.sleep(for: .milliseconds(500))
+                try await Task.sleep(nanoseconds: 500_000_000)
             }
 
             client = try DockerEngineClient()

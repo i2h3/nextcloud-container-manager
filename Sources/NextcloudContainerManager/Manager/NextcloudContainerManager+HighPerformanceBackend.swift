@@ -133,7 +133,7 @@ extension NextcloudContainerManager {
                 // The daemon is not listening yet – retry after a short delay.
             }
 
-            try await Task.sleep(for: .milliseconds(250))
+            try await Task.sleep(nanoseconds: 250_000_000)
         }
 
         throw DockerClientError.timeout
@@ -251,7 +251,7 @@ extension NextcloudContainerManager {
 
             // A network that still has attached endpoints answers 403; retry briefly while containers finish detaching.
             if response.statusCode == 403, Date() < deadline {
-                try await Task.sleep(for: .milliseconds(250))
+                try await Task.sleep(nanoseconds: 250_000_000)
 
                 continue
             }
