@@ -56,17 +56,26 @@ public enum NextcloudContainerManager {
     ///
     /// - Returns: A handle for the running container.
     ///
-    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, ``NextcloudContainerManagerError/unsupportedArchitecture(_:)`` if the push daemon cannot run on the Docker Engine's architecture, or a `DockerClientError` for any API-level failure.
+    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, ``NextcloudContainerManagerError/portUnavailable(_:)`` if a requested host port is already in use, ``NextcloudContainerManagerError/unsupportedArchitecture(_:)`` if the push daemon cannot run on the Docker Engine's architecture, or a `DockerClientError` for any API-level failure.
     ///
     public static func deploy(configuration: NextcloudConfiguration = NextcloudConfiguration()) async throws -> NextcloudContainer {
         let client = try await makeDockerEngineClient()
 
-        // 1. Find a free host port to forward to container port 80.
-        let port = try findFreePort()
+        // 1. Take the requested host port to forward to container port 80, or find a free one.
+        let port = try configuration.port.map { requested in
+            try ensurePortIsFree(requested)
 
-        // 2. When push notifications are enabled, find a second free port for the push endpoint and assemble a deployment identifier used to name and later reclaim the supporting infrastructure.
+            return requested
+        } ?? findFreePort()
+
+        // 2. When push notifications are enabled, do the same for the push endpoint and assemble a deployment identifier used to name and later reclaim the supporting infrastructure.
         let deployment: String? = configuration.pushNotifications ? UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased() : nil
-        let pushPort: UInt16? = configuration.pushNotifications ? try findFreePort() : nil
+
+        let pushPort: UInt16? = try configuration.pushNotifications ? configuration.pushPort.map { requested in
+            try ensurePortIsFree(requested)
+
+            return requested
+        } ?? findFreePort() : nil
 
         // 3. Assemble the create-container options, extending them for the High Performance Backend when requested.
         var environment = [

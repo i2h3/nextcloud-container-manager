@@ -32,6 +32,22 @@ public struct NextcloudConfiguration: Sendable {
     public let users: [String]
 
     ///
+    /// The host port to publish the Nextcloud server on, or `nil` to let the kernel pick a free one.
+    ///
+    /// A deployment normally takes whatever port happens to be free, which is right for a throwaway container. It is wrong whenever something outside the container remembers the address: a macOS File Provider domain, for instance, is named after the server it belongs to, and a name which changes on every deployment is a new domain each time — with its own privacy consent to be granted by hand. Pinning the port keeps such names stable across runs.
+    ///
+    /// Deployment fails with ``NextcloudContainerManagerError/portUnavailable(_:)`` when the requested port is already taken.
+    ///
+    public let port: UInt16?
+
+    ///
+    /// The host port to publish the websocket push endpoint on, or `nil` to let the kernel pick a free one.
+    ///
+    /// Only meaningful together with ``pushNotifications``, and pinned for the same reasons as ``port``.
+    ///
+    public let pushPort: UInt16?
+
+    ///
     /// Whether to enable the High Performance Backend for Files so connected clients receive websocket push notifications instead of polling.
     ///
     /// When `true`, ``NextcloudContainerManager/deploy(configuration:)`` additionally deploys a Redis sidecar on a dedicated network, configures the Nextcloud instance to use it, installs the `notify_push` app, launches its push daemon inside the container and registers it with the server. The host port the push endpoint is reachable on is reported as ``NextcloudContainer/pushPort``. Tearing the deployment down with ``NextcloudContainerManager/delete(_:)`` removes the sidecar and network as well. Disabled by default.
@@ -47,12 +63,16 @@ public struct NextcloudConfiguration: Sendable {
     ///     - enabledApps: App identifiers to enable, and install when necessary, after deployment. Empty by default.
     ///     - users: Identifiers of additional users to create after deployment. Empty by default.
     ///     - pushNotifications: Whether to enable the High Performance Backend for Files. Disabled by default.
+    ///     - port: The host port to publish the Nextcloud server on. A free one is picked by default.
+    ///     - pushPort: The host port to publish the websocket push endpoint on. A free one is picked by default.
     ///
-    public init(tag: String = "latest", disabledApps: [String] = [], enabledApps: [String] = [], users: [String] = [], pushNotifications: Bool = false) {
+    public init(tag: String = "latest", disabledApps: [String] = [], enabledApps: [String] = [], users: [String] = [], pushNotifications: Bool = false, port: UInt16? = nil, pushPort: UInt16? = nil) {
         self.tag = tag
         self.disabledApps = disabledApps
         self.enabledApps = enabledApps
-        self.users = users
+        self.port = port
         self.pushNotifications = pushNotifications
+        self.pushPort = pushPort
+        self.users = users
     }
 }

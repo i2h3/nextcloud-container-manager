@@ -16,6 +16,13 @@ public enum NextcloudContainerManagerError: Error {
     case dockerDesktopLaunchFailed
 
     ///
+    /// A host port requested through ``NextcloudConfiguration/port`` or ``NextcloudConfiguration/pushPort`` is already in use.
+    ///
+    /// The associated value is the requested port.
+    ///
+    case portUnavailable(UInt16)
+
+    ///
     /// The Docker Engine reported an architecture the `notify_push` app ships no binary for, so the High Performance Backend cannot be started.
     ///
     /// The associated value is the reported architecture.
