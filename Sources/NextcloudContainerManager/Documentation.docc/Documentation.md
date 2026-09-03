@@ -38,13 +38,29 @@ try await NextcloudContainerManager.delete(container.id)
 
 ### Managing the server
 
-``NextcloudContainerManager/deploy(configuration:)`` returns a ``NextcloudContainer`` — a lightweight value carrying the container's ``NextcloudContainer/id`` and the host ``NextcloudContainer/port`` the server is reachable on.
+``NextcloudContainerManager/deploy(configuration:)`` returns a ``NextcloudContainer`` — a lightweight value carrying the container's ``NextcloudContainer/id``, its ``NextcloudContainer/name`` and the host ``NextcloudContainer/port`` the server is reachable on.
 
 Every management operation is a stateless function on ``NextcloudContainerManager`` keyed by the container identifier, so callers that only persist an id — for example a Model Context Protocol server — can use them without holding the ``NextcloudContainer`` value.
 Use ``NextcloudContainerManager/addApp(_:inContainer:)``, ``NextcloudContainerManager/removeApp(_:inContainer:)``, ``NextcloudContainerManager/enableApp(_:inContainer:)`` and ``NextcloudContainerManager/disableApp(_:inContainer:)`` for apps, and ``NextcloudContainerManager/addUser(_:inContainer:)``, ``NextcloudContainerManager/removeUser(_:inContainer:)``, ``NextcloudContainerManager/enableUser(_:inContainer:)`` and ``NextcloudContainerManager/disableUser(_:inContainer:)`` for users.
 Each maps to an `occ` command executed inside the container, so a failure surfaces as a thrown error rather than a silent no-op.
 
 When a test fails, ``NextcloudContainerManager/logFile(inContainer:)`` copies the Nextcloud application log (`data/nextcloud.log`) out of the container into a temporary file and returns its URL — a point-in-time snapshot the same id-only callers can read.
+
+### Pinning the name and the port
+
+A deployment normally takes whatever host port happens to be free and lets the Docker Engine generate a container name, which is right for a throwaway container.
+Sometimes it is necessary to have a stable port or container name, though.
+Set ``NextcloudConfiguration/name`` and ``NextcloudConfiguration/port`` to keep both stable across runs.
+
+```swift
+let container = try await NextcloudContainerManager.deploy(
+    configuration: NextcloudConfiguration(name: "nextcloud-tests", port: 8080)
+)
+```
+
+Both are checked before anything is created, so a taken port fails with ``NextcloudContainerManagerError/portUnavailable(_:)``, a taken name with ``NextcloudContainerManagerError/containerNameUnavailable(_:)`` and a name the Docker Engine would not accept with ``NextcloudContainerManagerError/invalidContainerName(_:)``.
+A pinned name doubles as an identifier: every function keyed by ``NextcloudContainer/id`` takes it in place of the identifier, so a leftover container can be torn down with ``NextcloudContainerManager/delete(_:)`` without having persisted its identifier.
+The name a deployment ended up with is reported as ``NextcloudContainer/name`` in either case, so a container which was left to the Docker Engine to name can be recognized in `docker ps` too.
 
 ### High Performance Backend for Files
 

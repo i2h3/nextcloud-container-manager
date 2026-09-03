@@ -16,6 +16,20 @@ public enum NextcloudContainerManagerError: Error {
     case dockerDesktopLaunchFailed
 
     ///
+    /// A container of the name requested through ``NextcloudConfiguration/name`` exists already.
+    ///
+    /// The associated value is the requested name. Names are taken by stopped containers too, so a leftover deployment which has not been removed yet occupies the name as well.
+    ///
+    case containerNameUnavailable(String)
+
+    ///
+    /// The name requested through ``NextcloudConfiguration/name`` is not one the Docker Engine accepts.
+    ///
+    /// The associated value is the requested name. The Docker Engine restricts container names to `[a-zA-Z0-9][a-zA-Z0-9_.-]+`.
+    ///
+    case invalidContainerName(String)
+
+    ///
     /// A host port requested through ``NextcloudConfiguration/port`` or ``NextcloudConfiguration/pushPort`` is already in use.
     ///
     /// The associated value is the requested port.
