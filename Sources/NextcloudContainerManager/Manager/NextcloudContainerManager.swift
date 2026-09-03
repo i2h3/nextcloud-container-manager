@@ -51,24 +51,32 @@ public enum NextcloudContainerManager {
     ///
     /// When ``NextcloudConfiguration/pushNotifications`` is enabled, a Redis sidecar is deployed on a dedicated network and the High Performance Backend for Files is provisioned, exposing the push endpoint on ``NextcloudContainer/pushPort``. The supporting infrastructure is removed again automatically if any step fails.
     ///
+    /// A ``NextcloudConfiguration/name`` given in the configuration names the container instead of letting the Docker Engine generate one. It is validated and checked for being free before anything is created, so a rejected or taken name costs no image pull. Either way the name the container ended up with is reported as ``NextcloudContainer/name``.
+    ///
     /// - Parameters:
-    ///     - configuration: Deployment options. Defaults to ``NextcloudConfiguration/init(tag:disabledApps:enabledApps:users:pushNotifications:)``.
+    ///     - configuration: Deployment options. Defaults to ``NextcloudConfiguration/init(tag:disabledApps:enabledApps:users:pushNotifications:name:port:pushPort:)``.
     ///
     /// - Returns: A handle for the running container.
     ///
-    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, ``NextcloudContainerManagerError/portUnavailable(_:)`` if a requested host port is already in use, ``NextcloudContainerManagerError/unsupportedArchitecture(_:)`` if the push daemon cannot run on the Docker Engine's architecture, or a `DockerClientError` for any API-level failure.
+    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, ``NextcloudContainerManagerError/invalidContainerName(_:)`` if a requested container name is malformed, ``NextcloudContainerManagerError/containerNameUnavailable(_:)`` if it is taken already, ``NextcloudContainerManagerError/portUnavailable(_:)`` if a requested host port is already in use, ``NextcloudContainerManagerError/unsupportedArchitecture(_:)`` if the push daemon cannot run on the Docker Engine's architecture, or a `DockerClientError` for any API-level failure.
     ///
     public static func deploy(configuration: NextcloudConfiguration = NextcloudConfiguration()) async throws -> NextcloudContainer {
         let client = try await makeDockerEngineClient()
 
-        // 1. Take the requested host port to forward to container port 80, or find a free one.
+        // 1. Reject a requested container name which Docker would not accept or which is taken already, before anything is created.
+        if let name = configuration.name {
+            try validateContainerName(name)
+            try await ensureContainerNameIsFree(name, using: client)
+        }
+
+        // 2. Take the requested host port to forward to container port 80, or find a free one.
         let port = try configuration.port.map { requested in
             try ensurePortIsFree(requested)
 
             return requested
         } ?? findFreePort()
 
-        // 2. When push notifications are enabled, do the same for the push endpoint and assemble a deployment identifier used to name and later reclaim the supporting infrastructure.
+        // 3. When push notifications are enabled, do the same for the push endpoint and assemble a deployment identifier used to name and later reclaim the supporting infrastructure.
         let deployment: String? = configuration.pushNotifications ? UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased() : nil
 
         let pushPort: UInt16? = try configuration.pushNotifications ? configuration.pushPort.map { requested in
@@ -77,7 +85,7 @@ public enum NextcloudContainerManager {
             return requested
         } ?? findFreePort() : nil
 
-        // 3. Assemble the create-container options, extending them for the High Performance Backend when requested.
+        // 4. Assemble the create-container options, extending them for the High Performance Backend when requested.
         var environment = [
             "SQLITE_DATABASE=nextcloud.sqlite",
             "NEXTCLOUD_ADMIN_USER=admin",
@@ -128,14 +136,16 @@ public enum NextcloudContainerManager {
             NetworkingConfig: nil
         )
 
-        // 4. Pull the Nextcloud image, then create and start the container and provision it, rolling back the container and any supporting infrastructure if a later step fails so nothing is leaked.
+        // 5. Pull the Nextcloud image, then create and start the container and provision it, rolling back the container and any supporting infrastructure if a later step fails so nothing is leaked.
         var createdId: String?
 
         do {
             // The create endpoint never pulls images, so the Nextcloud image is pulled explicitly before the container is created.
             try await pullImage(nextcloudImage, using: client)
 
-            let createResponse = try await client.post(path: "/containers/create", body: requestBody)
+            // A validated name contains no characters which would need percent-encoding in the query string.
+            let createPath = configuration.name.map { "/containers/create?name=\($0)" } ?? "/containers/create"
+            let createResponse = try await client.post(path: createPath, body: requestBody)
 
             guard createResponse.statusCode == 201 else {
                 let message = String(data: createResponse.body, encoding: .utf8) ?? "<no body>"
@@ -152,9 +162,11 @@ public enum NextcloudContainerManager {
                 throw DockerClientError.unexpectedStatusCode(startResponse.statusCode, message)
             }
 
-            let container = NextcloudContainer(
+            // The name a deployment ends up with is only readable from the container itself, because the Docker Engine generates one when none was requested.
+            let container = try await NextcloudContainer(
                 configuration: configuration,
                 id: created.Id,
+                name: containerName(of: created.Id, using: client),
                 port: UInt(port),
                 pushPort: pushPort.map(UInt.init)
             )
