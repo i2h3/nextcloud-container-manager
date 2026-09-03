@@ -45,6 +45,10 @@ Use ``NextcloudContainerManager/addApp(_:inContainer:)``, ``NextcloudContainerMa
 Each maps to an `occ` command executed inside the container, so a failure surfaces as a thrown error rather than a silent no-op.
 
 When a test fails, ``NextcloudContainerManager/logFile(inContainer:)`` copies the Nextcloud application log (`data/nextcloud.log`) out of the container into a temporary file and returns its URL — a point-in-time snapshot the same id-only callers can read.
+``NextcloudContainerManager/accessLogFile(inContainer:)`` does the same for the Apache access log, which records one line per handled request and therefore shows what a failing client actually sent and which status code it was answered with.
+``NextcloudContainerManager/errorLogFile(inContainer:)`` returns the Apache error log next to it, holding what the web server itself reports — startup notices and the failures of requests that died before Nextcloud could log anything about them.
+Inside the container both are symbolic links to the standard output and standard error of the container rather than files, so they are read from its output streams, the same source as `docker logs`.
+Mind that these two trail the container: the Docker Engine hands out what it has captured, and an idle container was observed to withhold its last lines for more than a minute, so read them after the exercise they should cover has run rather than right after a single request.
 
 ### Pinning the name and the port
 

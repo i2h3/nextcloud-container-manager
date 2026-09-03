@@ -24,3 +24,5 @@
 ### Reading logs
 
 - ``logFile(inContainer:)``
+- ``accessLogFile(inContainer:)``
+- ``errorLogFile(inContainer:)``
