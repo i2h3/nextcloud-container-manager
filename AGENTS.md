@@ -11,7 +11,8 @@ The `NextcloudContainerManager` library target groups its source files into fold
 
 - `Manager/` holds the `NextcloudContainerManager` enum and its feature extensions (`+AppManagement`, `+UserManagement`, `+CommandExecution`, `+Suspension`, `+Provisioning`, `+HighPerformanceBackend`, `+Logs`), one feature group per file.
 - `PublicTypes/` holds the remaining public types (`NextcloudConfiguration`, `NextcloudContainer`, `NextcloudContainerManagerError`, `CommandResult`).
-- `DockerClient/` holds the Docker Engine client and its supporting utilities (`DockerEngineClient`, `DockerClientError`, `CancellableSocket`, `findFreePort`, `ensurePortIsFree`, `validateContainerName`, `ensureContainerNameIsFree`, `containerName`, `firstFileInTarArchive`, `demultiplexDockerStream`).
+- Every failure the library reports is a case of `NextcloudContainerManagerError`. Adding one is a breaking change, so a new failure condition waits for the next major release rather than being folded into an existing case.
+- `DockerClient/` holds the Docker Engine client and its supporting utilities (`DockerEngineClient`, `EngineResponse`, `CancellableSocket`, `findFreePort`, `ensurePortIsFree`, `validateContainerName`, `ensureContainerNameIsFree`, `containerName`, `firstFileInTarArchive`, `demultiplexDockerStream`).
 - `Requests/` and `Responses/` hold the Docker Engine and Nextcloud request and response body models.
 - `Documentation.docc/` holds the DocC catalog.
 

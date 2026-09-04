@@ -17,16 +17,13 @@ public extension NextcloudContainerManager {
     /// - Parameters:
     ///     - id: The Docker container identifier or name returned by ``deploy(configuration:)``.
     ///
-    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, or a `DockerClientError` for any API-level failure.
+    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, or another case of ``NextcloudContainerManagerError`` for a Docker Engine request that fails, times out or cannot be made.
     ///
     static func pause(_ id: String) async throws {
         let client = try await makeDockerEngineClient()
         let response = try await client.post(path: "/containers/\(id)/pause")
 
-        guard response.statusCode == 204 else {
-            let message = String(data: response.body, encoding: .utf8) ?? "<no body>"
-            throw DockerClientError.unexpectedStatusCode(response.statusCode, message)
-        }
+        try response.checked([204])
     }
 
     ///
@@ -37,15 +34,12 @@ public extension NextcloudContainerManager {
     /// - Parameters:
     ///     - id: The Docker container identifier or name returned by ``deploy(configuration:)``.
     ///
-    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, or a `DockerClientError` for any API-level failure.
+    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, or another case of ``NextcloudContainerManagerError`` for a Docker Engine request that fails, times out or cannot be made.
     ///
     static func resume(_ id: String) async throws {
         let client = try await makeDockerEngineClient()
         let response = try await client.post(path: "/containers/\(id)/unpause")
 
-        guard response.statusCode == 204 else {
-            let message = String(data: response.body, encoding: .utf8) ?? "<no body>"
-            throw DockerClientError.unexpectedStatusCode(response.statusCode, message)
-        }
+        try response.checked([204])
     }
 }

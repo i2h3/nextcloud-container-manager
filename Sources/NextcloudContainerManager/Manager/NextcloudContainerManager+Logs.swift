@@ -23,7 +23,7 @@ public extension NextcloudContainerManager {
     ///
     /// - Returns: The URL of the copied log file inside a unique temporary directory.
     ///
-    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, a `DockerClientError` if the container or log file does not exist or the archive cannot be parsed, or any error raised while writing the file to disk.
+    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, ``NextcloudContainerManagerError/engineRequestFailed(path:statusCode:message:)`` if the container or log file does not exist, ``NextcloudContainerManagerError/engineResponseUnreadable(path:)`` if the archive cannot be parsed, or any error raised while writing the file to disk.
     ///
     static func logFile(inContainer id: String) async throws -> URL {
         let logPath = "/var/www/html/data/nextcloud.log"
@@ -32,14 +32,11 @@ public extension NextcloudContainerManager {
         let client = try await makeDockerEngineClient()
         let response = try await client.get(path: "/containers/\(id)/archive?path=\(logPath)")
 
-        guard response.statusCode == 200 else {
-            let message = String(data: response.body, encoding: .utf8) ?? "<no body>"
-            throw DockerClientError.unexpectedStatusCode(response.statusCode, message)
-        }
+        try response.checked([200])
 
         // 2. Unpack the single-file archive to obtain the log's bytes as they were at call time.
         guard let contents = firstFileInTarArchive(response.body) else {
-            throw DockerClientError.invalidResponse
+            throw NextcloudContainerManagerError.engineResponseUnreadable(path: response.path)
         }
 
         // 3. Write the snapshot into a unique temporary directory and hand back its location.
@@ -64,7 +61,7 @@ public extension NextcloudContainerManager {
     ///
     /// - Returns: The URL of the written log file inside a unique temporary directory.
     ///
-    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, a `DockerClientError` if the container does not exist, or any error raised while writing the file to disk.
+    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, ``NextcloudContainerManagerError/engineRequestFailed(path:statusCode:message:)`` if the container does not exist, or any error raised while writing the file to disk.
     ///
     static func accessLogFile(inContainer id: String) async throws -> URL {
         let contents = try await containerStream(inContainer: id, standardError: false)
@@ -86,7 +83,7 @@ public extension NextcloudContainerManager {
     ///
     /// - Returns: The URL of the written log file inside a unique temporary directory.
     ///
-    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, a `DockerClientError` if the container does not exist, or any error raised while writing the file to disk.
+    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, ``NextcloudContainerManagerError/engineRequestFailed(path:statusCode:message:)`` if the container does not exist, or any error raised while writing the file to disk.
     ///
     static func errorLogFile(inContainer id: String) async throws -> URL {
         let contents = try await containerStream(inContainer: id, standardError: true)
@@ -107,17 +104,14 @@ public extension NextcloudContainerManager {
     ///
     /// - Returns: The bytes the container wrote to the requested stream so far.
     ///
-    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, or a `DockerClientError` if the container does not exist.
+    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, or ``NextcloudContainerManagerError/engineRequestFailed(path:statusCode:message:)`` if the container does not exist.
     ///
     private static func containerStream(inContainer id: String, standardError: Bool) async throws -> Data {
         let client = try await makeDockerEngineClient()
         let stream = standardError ? "stderr" : "stdout"
         let response = try await client.get(path: "/containers/\(id)/logs?\(stream)=true")
 
-        guard response.statusCode == 200 else {
-            let message = String(data: response.body, encoding: .utf8) ?? "<no body>"
-            throw DockerClientError.unexpectedStatusCode(response.statusCode, message)
-        }
+        try response.checked([200])
 
         let streams = demultiplexDockerStream(response.body)
 

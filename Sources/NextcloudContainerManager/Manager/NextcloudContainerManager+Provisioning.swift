@@ -50,7 +50,7 @@ extension NextcloudContainerManager {
     /// - Parameters:
     ///     - port: The host port the container's HTTP port 80 is mapped to.
     ///
-    /// - Throws: ``DockerClientError/timeout`` when the instance does not become ready within 120 seconds.
+    /// - Throws: ``NextcloudContainerManagerError/nextcloudInstallationTimedOut`` when the instance does not become ready within 120 seconds.
     ///
     private static func waitUntilReady(port: UInt) async throws {
         let url = URL(string: "http://localhost:\(port)/status.php")!
@@ -71,6 +71,6 @@ extension NextcloudContainerManager {
             try await Task.sleep(nanoseconds: 500_000_000)
         }
 
-        throw DockerClientError.timeout
+        throw NextcloudContainerManagerError.nextcloudInstallationTimedOut
     }
 }

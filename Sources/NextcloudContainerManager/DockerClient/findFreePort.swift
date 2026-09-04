@@ -9,13 +9,13 @@ import Darwin
 /// There is a small TOCTOU window between releasing the socket and Docker binding to the port, which is acceptable for test-container use.
 ///
 /// - Returns: A free port number on the local host.
-/// - Throws: ``DockerClientError/couldNotFindFreePort`` when the kernel does not grant a socket or assign a port.
+/// - Throws: ``NextcloudContainerManagerError/couldNotAllocatePort`` when the kernel does not grant a socket or assign a port.
 ///
 func findFreePort() throws -> UInt16 {
     let sock = Darwin.socket(AF_INET, SOCK_STREAM, 0)
 
     guard sock >= 0 else {
-        throw DockerClientError.couldNotFindFreePort
+        throw NextcloudContainerManagerError.couldNotAllocatePort
     }
 
     defer { Darwin.close(sock) }
@@ -33,7 +33,7 @@ func findFreePort() throws -> UInt16 {
     }
 
     guard bindResult == 0 else {
-        throw DockerClientError.couldNotFindFreePort
+        throw NextcloudContainerManagerError.couldNotAllocatePort
     }
 
     var addrLen = socklen_t(MemoryLayout<sockaddr_in>.size)
@@ -44,7 +44,7 @@ func findFreePort() throws -> UInt16 {
     }
 
     guard nameResult == 0 else {
-        throw DockerClientError.couldNotFindFreePort
+        throw NextcloudContainerManagerError.couldNotAllocatePort
     }
 
     return addr.sin_port.bigEndian

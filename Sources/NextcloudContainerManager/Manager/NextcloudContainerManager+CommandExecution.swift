@@ -36,7 +36,7 @@ public extension NextcloudContainerManager {
     ///
     /// - Returns: What the command wrote to its output streams. An `occ` command is always waited for, so there is always a result.
     ///
-    /// - Throws: ``NextcloudContainerManagerError/commandFailed(command:result:)`` if the command exits with a non-zero status, ``NextcloudContainerManagerError/commandTimedOut(command:)`` if it produces nothing within `timeout`, `CancellationError` if the surrounding task is cancelled while waiting, or a `DockerClientError` for any API-level failure.
+    /// - Throws: ``NextcloudContainerManagerError/commandFailed(command:result:)`` if the command exits with a non-zero status, ``NextcloudContainerManagerError/commandTimedOut(command:)`` if it produces nothing within `timeout`, ``NextcloudContainerManagerError/commandStatusUnavailable(command:)`` if it finishes without the Docker Engine reporting a status, `CancellationError` if the surrounding task is cancelled while waiting, or another case of ``NextcloudContainerManagerError`` for a Docker Engine request that fails, times out or cannot be made.
     ///
     @discardableResult
     static func runOCC(_ arguments: [String], environment: [String] = [], timeout: TimeInterval? = defaultCommandTimeout, inContainer id: String) async throws -> CommandResult {
@@ -63,7 +63,7 @@ public extension NextcloudContainerManager {
     ///
     /// - Returns: What the command wrote to its output streams, or `nil` when `waitsForExit` is `false` and the command was left running.
     ///
-    /// - Throws: ``NextcloudContainerManagerError/commandFailed(command:result:)`` if the command exits with a non-zero status, ``NextcloudContainerManagerError/commandTimedOut(command:)`` if it produces nothing within `timeout`, `CancellationError` if the surrounding task is cancelled while waiting, or a `DockerClientError` for any API-level failure.
+    /// - Throws: ``NextcloudContainerManagerError/commandFailed(command:result:)`` if the command exits with a non-zero status, ``NextcloudContainerManagerError/commandTimedOut(command:)`` if it produces nothing within `timeout`, ``NextcloudContainerManagerError/commandStatusUnavailable(command:)`` if it finishes without the Docker Engine reporting a status, `CancellationError` if the surrounding task is cancelled while waiting, or another case of ``NextcloudContainerManagerError`` for a Docker Engine request that fails, times out or cannot be made.
     ///
     @discardableResult
     static func runExec(_ command: [String], user: String = "www-data", workingDirectory: String = "/var/www/html", environment: [String] = [], waitsForExit: Bool = true, timeout: TimeInterval? = defaultCommandTimeout, inContainer id: String) async throws -> CommandResult? {
@@ -98,10 +98,7 @@ extension NextcloudContainerManager {
         let request = CreateExecRequest(Cmd: command, User: user, WorkingDir: workingDirectory, Env: environment.isEmpty ? nil : environment, AttachStdout: attachesOutput, AttachStderr: attachesOutput)
         let response = try await client.post(path: "/containers/\(id)/exec", body: request)
 
-        guard response.statusCode == 201 else {
-            let message = String(data: response.body, encoding: .utf8) ?? "<no body>"
-            throw DockerClientError.unexpectedStatusCode(response.statusCode, message)
-        }
+        try response.checked([201])
 
         return try JSONDecoder().decode(CreateExecResponse.self, from: response.body).Id
     }
@@ -123,10 +120,7 @@ extension NextcloudContainerManager {
         let exec = try await createExec(command, user: user, workingDirectory: workingDirectory, environment: environment, attachesOutput: false, inContainer: id, using: client)
         let response = try await client.post(path: "/exec/\(exec)/start", body: StartExecRequest(Detach: true, Tty: false))
 
-        guard response.statusCode == 200 else {
-            let message = String(data: response.body, encoding: .utf8) ?? "<no body>"
-            throw DockerClientError.unexpectedStatusCode(response.statusCode, message)
-        }
+        try response.checked([200])
     }
 
     ///
@@ -148,23 +142,20 @@ extension NextcloudContainerManager {
 
         // The socket cannot express "no time at all" — a zero interval means no deadline to the kernel — so a non-positive or otherwise unusable allowance is clamped to the smallest one that still expires. The literal comes first because max returns its first argument when the second is not a number.
         let allowance = timeout.map { max(0.001, $0) }
-        let stream: (statusCode: Int, body: Data)
+        let stream: EngineResponse
 
         do {
             stream = try await client.post(path: "/exec/\(exec)/start", body: StartExecRequest(Detach: false, Tty: false), timeout: allowance)
-        } catch DockerClientError.requestTimedOut {
+        } catch NextcloudContainerManagerError.engineRequestTimedOut {
             throw NextcloudContainerManagerError.commandTimedOut(command: command)
         }
 
-        guard stream.statusCode == 200 else {
-            let message = String(data: stream.body, encoding: .utf8) ?? "<no body>"
-            throw DockerClientError.unexpectedStatusCode(stream.statusCode, message)
-        }
+        try stream.checked([200])
 
         let streams = demultiplexDockerStream(stream.body)
 
         let result = try await CommandResult(
-            exitCode: exitCode(ofExec: exec, using: client),
+            exitCode: exitCode(ofExec: exec, running: command, using: client),
             standardOutput: String(decoding: streams.standardOutput, as: UTF8.self),
             standardError: String(decoding: streams.standardError, as: UTF8.self)
         )
@@ -183,11 +174,14 @@ extension NextcloudContainerManager {
     ///
     /// - Parameters:
     ///     - id: The exec instance identifier.
+    ///     - command: The command that was run, for reporting a status that never arrives.
     ///     - client: The Docker Engine client to use.
     ///
-    /// - Returns: The exit status, or zero if the Docker Engine reports none.
+    /// - Returns: The status the command exited with.
     ///
-    private static func exitCode(ofExec id: String, using client: DockerEngineClient) async throws -> Int {
+    /// - Throws: ``NextcloudContainerManagerError/commandStatusUnavailable(command:)`` when the Docker Engine does not report a status for a command that has finished.
+    ///
+    private static func exitCode(ofExec id: String, running command: [String], using client: DockerEngineClient) async throws -> Int {
         let deadline = Date().addingTimeInterval(5)
 
         while true {
@@ -195,27 +189,29 @@ extension NextcloudContainerManager {
             let remaining = deadline.timeIntervalSinceNow
 
             guard remaining > 0 else {
-                throw DockerClientError.timeout
+                throw NextcloudContainerManagerError.commandStatusUnavailable(command: command)
             }
 
-            let response: (statusCode: Int, body: Data)
+            let response: EngineResponse
 
             do {
                 response = try await client.get(path: "/exec/\(id)/json", timeout: max(0.001, remaining))
-            } catch DockerClientError.requestTimedOut {
-                throw DockerClientError.timeout
+            } catch NextcloudContainerManagerError.engineRequestTimedOut {
+                throw NextcloudContainerManagerError.commandStatusUnavailable(command: command)
             }
 
             // The exec instance disappears together with its container, so a container removed underneath a command has to be reported as the missing resource it is rather than as an undecodable response body.
-            guard response.statusCode == 200 else {
-                let message = String(data: response.body, encoding: .utf8) ?? "<no body>"
-                throw DockerClientError.unexpectedStatusCode(response.statusCode, message)
-            }
+            try response.checked([200])
 
             let info = try JSONDecoder().decode(ExecInspectResponse.self, from: response.body)
 
             if !info.Running {
-                return info.ExitCode ?? 0
+                // A stopped exec instance always carries a status, so its absence is a malformed response rather than a zero. Reading it as zero would let an incomplete answer pass for a command that succeeded, which is the one direction this must never fail in.
+                guard let exitCode = info.ExitCode else {
+                    throw NextcloudContainerManagerError.commandStatusUnavailable(command: command)
+                }
+
+                return exitCode
             }
 
             try await Task.sleep(nanoseconds: 50_000_000)
