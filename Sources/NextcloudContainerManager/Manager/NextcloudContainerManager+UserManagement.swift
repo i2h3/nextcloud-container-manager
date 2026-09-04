@@ -19,7 +19,7 @@ public extension NextcloudContainerManager {
     ///     - timeout: How long to wait for the command to finish, or `nil` to wait for as long as it takes. Defaults to ``defaultCommandTimeout``.
     ///     - id: The Docker container identifier to run the command in.
     ///
-    /// - Throws: ``NextcloudContainerManagerError/commandFailed(command:result:)`` if the command exits with a non-zero status, ``NextcloudContainerManagerError/commandTimedOut(command:)`` if it produces nothing within `timeout`, `CancellationError` if the surrounding task is cancelled while waiting, or a `DockerClientError` for any API-level failure.
+    /// - Throws: ``NextcloudContainerManagerError/commandFailed(command:result:)`` if the command exits with a non-zero status, ``NextcloudContainerManagerError/commandTimedOut(command:)`` if it produces nothing within `timeout`, ``NextcloudContainerManagerError/commandStatusUnavailable(command:)`` if it finishes without the Docker Engine reporting a status, `CancellationError` if the surrounding task is cancelled while waiting, or another case of ``NextcloudContainerManagerError`` for a Docker Engine request that fails, times out or cannot be made.
     ///
     static func addUser(_ user: String, timeout: TimeInterval? = defaultCommandTimeout, inContainer id: String) async throws {
         try await runOCC(["user:add", "--password-from-env", user], environment: ["OC_PASS=\(user)"], timeout: timeout, inContainer: id)
@@ -33,7 +33,7 @@ public extension NextcloudContainerManager {
     ///     - timeout: How long to wait for the command to finish, or `nil` to wait for as long as it takes. Defaults to ``defaultCommandTimeout``.
     ///     - id: The Docker container identifier to run the command in.
     ///
-    /// - Throws: ``NextcloudContainerManagerError/commandFailed(command:result:)`` if the command exits with a non-zero status, ``NextcloudContainerManagerError/commandTimedOut(command:)`` if it produces nothing within `timeout`, `CancellationError` if the surrounding task is cancelled while waiting, or a `DockerClientError` for any API-level failure.
+    /// - Throws: ``NextcloudContainerManagerError/commandFailed(command:result:)`` if the command exits with a non-zero status, ``NextcloudContainerManagerError/commandTimedOut(command:)`` if it produces nothing within `timeout`, ``NextcloudContainerManagerError/commandStatusUnavailable(command:)`` if it finishes without the Docker Engine reporting a status, `CancellationError` if the surrounding task is cancelled while waiting, or another case of ``NextcloudContainerManagerError`` for a Docker Engine request that fails, times out or cannot be made.
     ///
     static func removeUser(_ user: String, timeout: TimeInterval? = defaultCommandTimeout, inContainer id: String) async throws {
         try await runOCC(["user:delete", user], timeout: timeout, inContainer: id)
@@ -47,7 +47,7 @@ public extension NextcloudContainerManager {
     ///     - timeout: How long to wait for the command to finish, or `nil` to wait for as long as it takes. Defaults to ``defaultCommandTimeout``.
     ///     - id: The Docker container identifier to run the command in.
     ///
-    /// - Throws: ``NextcloudContainerManagerError/commandFailed(command:result:)`` if the command exits with a non-zero status, ``NextcloudContainerManagerError/commandTimedOut(command:)`` if it produces nothing within `timeout`, `CancellationError` if the surrounding task is cancelled while waiting, or a `DockerClientError` for any API-level failure.
+    /// - Throws: ``NextcloudContainerManagerError/commandFailed(command:result:)`` if the command exits with a non-zero status, ``NextcloudContainerManagerError/commandTimedOut(command:)`` if it produces nothing within `timeout`, ``NextcloudContainerManagerError/commandStatusUnavailable(command:)`` if it finishes without the Docker Engine reporting a status, `CancellationError` if the surrounding task is cancelled while waiting, or another case of ``NextcloudContainerManagerError`` for a Docker Engine request that fails, times out or cannot be made.
     ///
     static func enableUser(_ user: String, timeout: TimeInterval? = defaultCommandTimeout, inContainer id: String) async throws {
         try await runOCC(["user:enable", user], timeout: timeout, inContainer: id)
@@ -61,7 +61,7 @@ public extension NextcloudContainerManager {
     ///     - timeout: How long to wait for the command to finish, or `nil` to wait for as long as it takes. Defaults to ``defaultCommandTimeout``.
     ///     - id: The Docker container identifier to run the command in.
     ///
-    /// - Throws: ``NextcloudContainerManagerError/commandFailed(command:result:)`` if the command exits with a non-zero status, ``NextcloudContainerManagerError/commandTimedOut(command:)`` if it produces nothing within `timeout`, `CancellationError` if the surrounding task is cancelled while waiting, or a `DockerClientError` for any API-level failure.
+    /// - Throws: ``NextcloudContainerManagerError/commandFailed(command:result:)`` if the command exits with a non-zero status, ``NextcloudContainerManagerError/commandTimedOut(command:)`` if it produces nothing within `timeout`, ``NextcloudContainerManagerError/commandStatusUnavailable(command:)`` if it finishes without the Docker Engine reporting a status, `CancellationError` if the surrounding task is cancelled while waiting, or another case of ``NextcloudContainerManagerError`` for a Docker Engine request that fails, times out or cannot be made.
     ///
     static func disableUser(_ user: String, timeout: TimeInterval? = defaultCommandTimeout, inContainer id: String) async throws {
         try await runOCC(["user:disable", user], timeout: timeout, inContainer: id)

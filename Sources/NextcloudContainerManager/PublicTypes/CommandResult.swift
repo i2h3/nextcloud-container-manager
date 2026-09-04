@@ -6,7 +6,7 @@
 ///
 /// This is returned by ``NextcloudContainerManager/runOCC(_:environment:timeout:inContainer:)`` and ``NextcloudContainerManager/runExec(_:user:workingDirectory:environment:waitsForExit:timeout:inContainer:)``, and it is also carried by ``NextcloudContainerManagerError/commandFailed(command:result:)`` so that a command which fails explains itself in the words of the program that ran, rather than only through a number.
 ///
-public struct CommandResult: Sendable {
+public struct CommandResult: Sendable, Equatable {
     ///
     /// The status the command exited with.
     ///

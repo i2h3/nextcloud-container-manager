@@ -8,7 +8,7 @@ import Foundation
 ///
 /// Uses POSIX sockets directly; `NWConnection` cannot drive a Unix-domain socket with TCP parameters on macOS and fails with `ENETDOWN`.
 ///
-/// Every request is bounded. The Docker Engine answers a request by streaming until it closes the connection, and it has been observed to stop doing either — leaving a call that never returns and a thread that never comes back. Each request therefore carries a timeout, applied to the connect, to every send and to every receive, so a silent daemon surfaces as ``DockerClientError/requestTimedOut(path:)`` instead of as a hang. Cancelling the surrounding task is the other way out: a blocked call cannot observe that by itself, so the socket is shut down through ``CancellableSocket`` to wake it, and the request ends as a `CancellationError`.
+/// Every request is bounded. The Docker Engine answers a request by streaming until it closes the connection, and it has been observed to stop doing either — leaving a call that never returns and a thread that never comes back. Each request therefore carries a timeout, applied to the connect, to every send and to every receive, so a silent daemon surfaces as ``NextcloudContainerManagerError/engineRequestTimedOut(path:)`` instead of as a hang. Cancelling the surrounding task is the other way out: a blocked call cannot observe that by itself, so the socket is shut down through ``CancellableSocket`` to wake it, and the request ends as a `CancellationError`.
 ///
 struct DockerEngineClient {
     ///
@@ -31,7 +31,7 @@ struct DockerEngineClient {
     ///
     init(socketPath: String = "/var/run/docker.sock") throws {
         guard FileManager.default.fileExists(atPath: socketPath) else {
-            throw DockerClientError.socketNotFound(socketPath)
+            throw NextcloudContainerManagerError.dockerEngineUnavailable(socketPath: socketPath)
         }
 
         self.socketPath = socketPath
@@ -42,7 +42,7 @@ struct DockerEngineClient {
     ///
     /// Send a `POST` request with a JSON-encoded body.
     ///
-    func post(path: String, body: some Encodable, timeout: TimeInterval? = defaultRequestTimeout) async throws -> (statusCode: Int, body: Data) {
+    func post(path: String, body: some Encodable, timeout: TimeInterval? = defaultRequestTimeout) async throws -> EngineResponse {
         let data = try JSONEncoder().encode(body)
         return try await send(method: "POST", path: path, body: data, timeout: timeout)
     }
@@ -50,27 +50,27 @@ struct DockerEngineClient {
     ///
     /// Send a `POST` request with no body.
     ///
-    func post(path: String, timeout: TimeInterval? = defaultRequestTimeout) async throws -> (statusCode: Int, body: Data) {
+    func post(path: String, timeout: TimeInterval? = defaultRequestTimeout) async throws -> EngineResponse {
         try await send(method: "POST", path: path, body: nil, timeout: timeout)
     }
 
     ///
     /// Send a `GET` request with no body.
     ///
-    func get(path: String, timeout: TimeInterval? = defaultRequestTimeout) async throws -> (statusCode: Int, body: Data) {
+    func get(path: String, timeout: TimeInterval? = defaultRequestTimeout) async throws -> EngineResponse {
         try await send(method: "GET", path: path, body: nil, timeout: timeout)
     }
 
     ///
     /// Send a `DELETE` request with no body.
     ///
-    func delete(path: String, timeout: TimeInterval? = defaultRequestTimeout) async throws -> (statusCode: Int, body: Data) {
+    func delete(path: String, timeout: TimeInterval? = defaultRequestTimeout) async throws -> EngineResponse {
         try await send(method: "DELETE", path: path, body: nil, timeout: timeout)
     }
 
     // MARK: - Core send
 
-    private func send(method: String, path: String, body: Data?, timeout: TimeInterval?) async throws -> (statusCode: Int, body: Data) {
+    private func send(method: String, path: String, body: Data?, timeout: TimeInterval?) async throws -> EngineResponse {
         var requestText = "\(method) \(path) HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n"
 
         if let body {
@@ -162,11 +162,17 @@ private func connectSocket(_ fileDescriptor: Int32, to address: inout sockaddr_u
     }
 
     var descriptor = pollfd(fd: fileDescriptor, events: Int16(POLLOUT), revents: 0)
-    let milliseconds: Int32 = timeout.flatMap { $0.isFinite && $0 > 0 ? Int32(min($0 * 1000, TimeInterval(Int32.max))) : nil } ?? -1
-    let ready = poll(&descriptor, 1, milliseconds)
+    let deadline = timeout.flatMap { $0.isFinite && $0 > 0 ? Date().addingTimeInterval($0) : nil }
+    var ready: Int32
+
+    // A signal arriving mid-wait is not a failed connection, so the wait is resumed rather than reported — against what is left of the deadline, so that being interrupted cannot extend it.
+    repeat {
+        let milliseconds: Int32 = deadline.map { Int32(min(max(0, $0.timeIntervalSinceNow) * 1000, TimeInterval(Int32.max))) } ?? -1
+        ready = poll(&descriptor, 1, milliseconds)
+    } while ready < 0 && errno == EINTR
 
     if ready == 0 {
-        throw DockerClientError.requestTimedOut(path: path)
+        throw NextcloudContainerManagerError.engineRequestTimedOut(path: path)
     }
 
     guard ready > 0 else {
@@ -188,7 +194,7 @@ private func dockerSocketRequest(
     requestData: Data,
     timeout: TimeInterval?,
     socket cancellation: CancellableSocket
-) throws -> (statusCode: Int, body: Data) {
+) throws -> EngineResponse {
     // ── 1. Open a Unix-domain stream socket ─────────────────────────────────
     let fd = socket(AF_UNIX, SOCK_STREAM, 0)
 
@@ -246,7 +252,7 @@ private func dockerSocketRequest(
             case EINTR:
                 continue
             case EAGAIN, EWOULDBLOCK:
-                throw DockerClientError.requestTimedOut(path: path)
+                throw NextcloudContainerManagerError.engineRequestTimedOut(path: path)
             default:
                 throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
         }
@@ -281,21 +287,21 @@ private func dockerSocketRequest(
             case EINTR:
                 continue
             case EAGAIN, EWOULDBLOCK:
-                throw DockerClientError.requestTimedOut(path: path)
+                throw NextcloudContainerManagerError.engineRequestTimedOut(path: path)
             default:
                 throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
         }
     }
 
     // ── 5. Parse the HTTP response ───────────────────────────────────────────
-    guard let parsed = parseHTTPResponse(responseData) else {
-        throw DockerClientError.invalidResponse
+    guard let parsed = parseHTTPResponse(responseData, path: path) else {
+        throw NextcloudContainerManagerError.engineResponseUnreadable(path: path)
     }
 
     return parsed
 }
 
-private func parseHTTPResponse(_ data: Data) -> (statusCode: Int, body: Data)? {
+private func parseHTTPResponse(_ data: Data, path: String) -> EngineResponse? {
     guard let separatorRange = data.range(of: Data("\r\n\r\n".utf8)) else {
         return nil
     }
@@ -321,7 +327,7 @@ private func parseHTTPResponse(_ data: Data) -> (statusCode: Int, body: Data)? {
         body = decodeChunked(body)
     }
 
-    return (statusCode: statusCode, body: body)
+    return EngineResponse(path: path, statusCode: statusCode, body: body)
 }
 
 private func decodeChunked(_ data: Data) -> Data {

@@ -12,7 +12,7 @@ import Foundation
 ///     - name: The container name to verify. Expected to have passed ``validateContainerName(_:)`` already, so it is safe to embed in the request path.
 ///     - client: The Docker Engine client to use.
 ///
-/// - Throws: ``NextcloudContainerManagerError/containerNameUnavailable(_:)`` when a container of that name exists, or `DockerClientError` for any API-level failure.
+/// - Throws: ``NextcloudContainerManagerError/containerNameUnavailable(_:)`` when a container of that name exists, or another case of ``NextcloudContainerManagerError`` for a Docker Engine request that fails, times out or cannot be made.
 ///
 func ensureContainerNameIsFree(_ name: String, using client: DockerEngineClient) async throws {
     let response = try await client.get(path: "/containers/\(name)/json")
@@ -23,7 +23,6 @@ func ensureContainerNameIsFree(_ name: String, using client: DockerEngineClient)
         case 200:
             throw NextcloudContainerManagerError.containerNameUnavailable(name)
         default:
-            let message = String(data: response.body, encoding: .utf8) ?? "<no body>"
-            throw DockerClientError.unexpectedStatusCode(response.statusCode, message)
+            try response.checked([200, 404])
     }
 }

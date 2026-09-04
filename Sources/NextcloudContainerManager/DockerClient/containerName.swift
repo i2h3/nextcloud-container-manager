@@ -14,15 +14,12 @@ import Foundation
 ///
 /// - Returns: The container name without its leading slash.
 ///
-/// - Throws: `DockerClientError` for any API-level failure.
+/// - Throws: Another case of ``nextcloudcontainermanagererror`` for a docker engine request that fails, times out or cannot be made.
 ///
 func containerName(of id: String, using client: DockerEngineClient) async throws -> String {
     let response = try await client.get(path: "/containers/\(id)/json")
 
-    guard response.statusCode == 200 else {
-        let message = String(data: response.body, encoding: .utf8) ?? "<no body>"
-        throw DockerClientError.unexpectedStatusCode(response.statusCode, message)
-    }
+    try response.checked([200])
 
     let inspect = try JSONDecoder().decode(ContainerInspectResponse.self, from: response.body)
 

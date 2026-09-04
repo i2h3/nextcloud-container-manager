@@ -116,7 +116,7 @@ extension NextcloudContainerManager {
     /// - Parameters:
     ///     - port: The host port the push daemon is published on.
     ///
-    /// - Throws: ``DockerClientError/timeout`` when the daemon does not start listening within 30 seconds.
+    /// - Throws: ``NextcloudContainerManagerError/pushBackendTimedOut`` when the daemon does not start listening within 30 seconds.
     ///
     private static func waitUntilPushReady(port: UInt) async throws {
         let url = URL(string: "http://localhost:\(port)/")!
@@ -136,13 +136,13 @@ extension NextcloudContainerManager {
             try await Task.sleep(nanoseconds: 250_000_000)
         }
 
-        throw DockerClientError.timeout
+        throw NextcloudContainerManagerError.pushBackendTimedOut
     }
 
     ///
     /// Pulls an image so it is available locally, because `POST /containers/create` never pulls missing images itself.
     ///
-    /// The Docker Engine streams progress and closes the connection when the pull finishes. A pull failure is reported as an error entry inside that stream rather than as an HTTP status, so the newline-delimited messages are inspected and ``DockerClientError/imagePullFailed(image:message:)`` is thrown as soon as one carries an error, instead of letting it surface later as a missing-image failure from container creation.
+    /// The Docker Engine streams progress and closes the connection when the pull finishes. A pull failure is reported as an error entry inside that stream rather than as an HTTP status, so the newline-delimited messages are inspected and ``NextcloudContainerManagerError/imagePullFailed(image:message:)`` is thrown as soon as one carries an error, instead of letting it surface later as a missing-image failure from container creation.
     ///
     /// - Parameters:
     ///     - image: The image reference, optionally including a tag (e.g. `redis:7-alpine`).
@@ -155,10 +155,7 @@ extension NextcloudContainerManager {
 
         let response = try await client.post(path: "/images/create?fromImage=\(name)&tag=\(tag)")
 
-        guard response.statusCode == 200 else {
-            let message = String(data: response.body, encoding: .utf8) ?? "<no body>"
-            throw DockerClientError.unexpectedStatusCode(response.statusCode, message)
-        }
+        try response.checked([200])
 
         // A pull failure is reported as an error entry inside the streamed body rather than as an HTTP status, so the
         // newline-delimited progress messages are inspected to fail here instead of later from container creation.
@@ -170,7 +167,7 @@ extension NextcloudContainerManager {
                 continue
             }
 
-            throw DockerClientError.imagePullFailed(image: image, message: error)
+            throw NextcloudContainerManagerError.imagePullFailed(image: image, message: error)
         }
     }
 
@@ -184,10 +181,7 @@ extension NextcloudContainerManager {
     static func createNetwork(named name: String, using client: DockerEngineClient) async throws {
         let response = try await client.post(path: "/networks/create", body: CreateNetworkRequest(Name: name))
 
-        guard response.statusCode == 201 else {
-            let message = String(data: response.body, encoding: .utf8) ?? "<no body>"
-            throw DockerClientError.unexpectedStatusCode(response.statusCode, message)
-        }
+        try response.checked([201])
     }
 
     ///
@@ -214,17 +208,11 @@ extension NextcloudContainerManager {
 
         let createResponse = try await client.post(path: "/containers/create?name=\(name)", body: requestBody)
 
-        guard createResponse.statusCode == 201 else {
-            let message = String(data: createResponse.body, encoding: .utf8) ?? "<no body>"
-            throw DockerClientError.unexpectedStatusCode(createResponse.statusCode, message)
-        }
+        try createResponse.checked([201])
 
         let startResponse = try await client.post(path: "/containers/\(name)/start")
 
-        guard startResponse.statusCode == 204 else {
-            let message = String(data: startResponse.body, encoding: .utf8) ?? "<no body>"
-            throw DockerClientError.unexpectedStatusCode(startResponse.statusCode, message)
-        }
+        try startResponse.checked([204])
     }
 
     ///
@@ -239,10 +227,7 @@ extension NextcloudContainerManager {
     static func forceRemoveContainer(_ idOrName: String, using client: DockerEngineClient) async throws {
         let response = try await client.delete(path: "/containers/\(idOrName)?force=true&v=true")
 
-        guard [200, 204, 404].contains(response.statusCode) else {
-            let message = String(data: response.body, encoding: .utf8) ?? "<no body>"
-            throw DockerClientError.unexpectedStatusCode(response.statusCode, message)
-        }
+        try response.checked([200, 204, 404])
     }
 
     ///
@@ -269,8 +254,7 @@ extension NextcloudContainerManager {
                 continue
             }
 
-            let message = String(data: response.body, encoding: .utf8) ?? "<no body>"
-            throw DockerClientError.unexpectedStatusCode(response.statusCode, message)
+            try response.checked([204, 404])
         }
     }
 

@@ -12,7 +12,7 @@ public enum NextcloudContainerManager {
 
         do {
             client = try DockerEngineClient()
-        } catch let DockerClientError.socketNotFound(socketPath) {
+        } catch let NextcloudContainerManagerError.dockerEngineUnavailable(socketPath) {
             guard FileManager.default.fileExists(atPath: "/Applications/Docker.app") else {
                 throw NextcloudContainerManagerError.dockerDesktopNotFound
             }
@@ -60,7 +60,7 @@ public enum NextcloudContainerManager {
     ///
     /// - Returns: A handle for the running container.
     ///
-    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, ``NextcloudContainerManagerError/invalidContainerName(_:)`` if a requested container name is malformed, ``NextcloudContainerManagerError/containerNameUnavailable(_:)`` if it is taken already, ``NextcloudContainerManagerError/portUnavailable(_:)`` if a requested host port is already in use, ``NextcloudContainerManagerError/unsupportedArchitecture(_:)`` if the push daemon cannot run on the Docker Engine's architecture, or a `DockerClientError` for any API-level failure.
+    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, ``NextcloudContainerManagerError/invalidContainerName(_:)`` if a requested container name is malformed, ``NextcloudContainerManagerError/containerNameUnavailable(_:)`` if it is taken already, ``NextcloudContainerManagerError/portUnavailable(_:)`` if a requested host port is already in use, ``NextcloudContainerManagerError/unsupportedArchitecture(_:)`` if the push daemon cannot run on the Docker Engine's architecture, ``NextcloudContainerManagerError/nextcloudInstallationTimedOut`` if the instance never finishes installing itself, or another case of ``NextcloudContainerManagerError`` for a Docker Engine request that fails, times out or cannot be made.
     ///
     public static func deploy(configuration: NextcloudConfiguration = NextcloudConfiguration()) async throws -> NextcloudContainer {
         let client = try await makeDockerEngineClient()
@@ -149,20 +149,14 @@ public enum NextcloudContainerManager {
             let createPath = configuration.name.map { "/containers/create?name=\($0)" } ?? "/containers/create"
             let createResponse = try await client.post(path: createPath, body: requestBody)
 
-            guard createResponse.statusCode == 201 else {
-                let message = String(data: createResponse.body, encoding: .utf8) ?? "<no body>"
-                throw DockerClientError.unexpectedStatusCode(createResponse.statusCode, message)
-            }
+            try createResponse.checked([201])
 
             let created = try JSONDecoder().decode(CreateContainerResponse.self, from: createResponse.body)
             createdId = created.Id
 
             let startResponse = try await client.post(path: "/containers/\(created.Id)/start")
 
-            guard startResponse.statusCode == 204 else {
-                let message = String(data: startResponse.body, encoding: .utf8) ?? "<no body>"
-                throw DockerClientError.unexpectedStatusCode(startResponse.statusCode, message)
-            }
+            try startResponse.checked([204])
 
             // The name a deployment ends up with is only readable from the container itself, because the Docker Engine generates one when none was requested.
             let container = try await NextcloudContainer(
@@ -199,7 +193,7 @@ public enum NextcloudContainerManager {
     /// - Parameters:
     ///     - id: The Docker container identifier returned by ``deploy(configuration:)``.
     ///
-    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, or a `DockerClientError` for any API-level failure.
+    /// - Throws: ``NextcloudContainerManagerError/dockerDesktopNotFound`` if Docker Desktop is not installed, ``NextcloudContainerManagerError/dockerDesktopLaunchFailed`` if it cannot be launched, or another case of ``NextcloudContainerManagerError`` for a Docker Engine request that fails, times out or cannot be made.
     ///
     public static func delete(_ id: String) async throws {
         let client = try await makeDockerEngineClient()
@@ -219,9 +213,6 @@ public enum NextcloudContainerManager {
         //   404 – container no longer exists (already removed)
         let response = try await client.post(path: "/containers/\(id)/stop")
 
-        guard [204, 304, 404].contains(response.statusCode) else {
-            let message = String(data: response.body, encoding: .utf8) ?? "<no body>"
-            throw DockerClientError.unexpectedStatusCode(response.statusCode, message)
-        }
+        try response.checked([204, 304, 404])
     }
 }
