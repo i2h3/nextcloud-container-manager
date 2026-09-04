@@ -19,7 +19,7 @@ public extension NextcloudContainerManager {
     ///     - timeout: How long to wait for the command to finish, or `nil` to wait for as long as it takes. Defaults to ``defaultCommandTimeout``.
     ///     - id: The Docker container identifier to run the command in.
     ///
-    /// - Throws: A `DockerClientError` if the command cannot be run, does not finish within `timeout`, or exits with a non-zero status.
+    /// - Throws: ``NextcloudContainerManagerError/commandFailed(command:result:)`` if the command exits with a non-zero status, ``NextcloudContainerManagerError/commandTimedOut(command:)`` if it produces nothing within `timeout`, `CancellationError` if the surrounding task is cancelled while waiting, or a `DockerClientError` for any API-level failure.
     ///
     static func addUser(_ user: String, timeout: TimeInterval? = defaultCommandTimeout, inContainer id: String) async throws {
         try await runOCC(["user:add", "--password-from-env", user], environment: ["OC_PASS=\(user)"], timeout: timeout, inContainer: id)
@@ -33,7 +33,7 @@ public extension NextcloudContainerManager {
     ///     - timeout: How long to wait for the command to finish, or `nil` to wait for as long as it takes. Defaults to ``defaultCommandTimeout``.
     ///     - id: The Docker container identifier to run the command in.
     ///
-    /// - Throws: A `DockerClientError` if the command cannot be run, does not finish within `timeout`, or exits with a non-zero status.
+    /// - Throws: ``NextcloudContainerManagerError/commandFailed(command:result:)`` if the command exits with a non-zero status, ``NextcloudContainerManagerError/commandTimedOut(command:)`` if it produces nothing within `timeout`, `CancellationError` if the surrounding task is cancelled while waiting, or a `DockerClientError` for any API-level failure.
     ///
     static func removeUser(_ user: String, timeout: TimeInterval? = defaultCommandTimeout, inContainer id: String) async throws {
         try await runOCC(["user:delete", user], timeout: timeout, inContainer: id)
@@ -47,7 +47,7 @@ public extension NextcloudContainerManager {
     ///     - timeout: How long to wait for the command to finish, or `nil` to wait for as long as it takes. Defaults to ``defaultCommandTimeout``.
     ///     - id: The Docker container identifier to run the command in.
     ///
-    /// - Throws: A `DockerClientError` if the command cannot be run, does not finish within `timeout`, or exits with a non-zero status.
+    /// - Throws: ``NextcloudContainerManagerError/commandFailed(command:result:)`` if the command exits with a non-zero status, ``NextcloudContainerManagerError/commandTimedOut(command:)`` if it produces nothing within `timeout`, `CancellationError` if the surrounding task is cancelled while waiting, or a `DockerClientError` for any API-level failure.
     ///
     static func enableUser(_ user: String, timeout: TimeInterval? = defaultCommandTimeout, inContainer id: String) async throws {
         try await runOCC(["user:enable", user], timeout: timeout, inContainer: id)
@@ -61,7 +61,7 @@ public extension NextcloudContainerManager {
     ///     - timeout: How long to wait for the command to finish, or `nil` to wait for as long as it takes. Defaults to ``defaultCommandTimeout``.
     ///     - id: The Docker container identifier to run the command in.
     ///
-    /// - Throws: A `DockerClientError` if the command cannot be run, does not finish within `timeout`, or exits with a non-zero status.
+    /// - Throws: ``NextcloudContainerManagerError/commandFailed(command:result:)`` if the command exits with a non-zero status, ``NextcloudContainerManagerError/commandTimedOut(command:)`` if it produces nothing within `timeout`, `CancellationError` if the surrounding task is cancelled while waiting, or a `DockerClientError` for any API-level failure.
     ///
     static func disableUser(_ user: String, timeout: TimeInterval? = defaultCommandTimeout, inContainer id: String) async throws {
         try await runOCC(["user:disable", user], timeout: timeout, inContainer: id)

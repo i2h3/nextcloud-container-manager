@@ -37,6 +37,20 @@ public enum NextcloudContainerManagerError: Error {
     case portUnavailable(UInt16)
 
     ///
+    /// A command run inside a container exited with a non-zero status.
+    ///
+    /// The associated values are the command as it was run and what it produced. Read ``CommandResult/standardError`` of the result to learn why it refused: `occ` reports its reasons there, and a message such as a rejected password or an unknown app identifier explains a failure that the status alone would leave a caller guessing about.
+    ///
+    case commandFailed(command: [String], result: CommandResult)
+
+    ///
+    /// A command run inside a container produced nothing for longer than it was given.
+    ///
+    /// The associated value is the command as it was run. The command itself is not stopped by this — an exec instance outlives the request that started it — so a container that is still around may well finish it afterwards.
+    ///
+    case commandTimedOut(command: [String])
+
+    ///
     /// The Docker Engine reported an architecture the `notify_push` app ships no binary for, so the High Performance Backend cannot be started.
     ///
     /// The associated value is the reported architecture.

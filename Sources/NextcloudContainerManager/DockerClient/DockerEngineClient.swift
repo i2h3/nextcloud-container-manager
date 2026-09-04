@@ -8,7 +8,16 @@ import Foundation
 ///
 /// Uses POSIX sockets directly; `NWConnection` cannot drive a Unix-domain socket with TCP parameters on macOS and fails with `ENETDOWN`.
 ///
+/// Every request is bounded. The Docker Engine answers a request by streaming until it closes the connection, and it has been observed to stop doing either — leaving a call that never returns and a thread that never comes back. Each request therefore carries a timeout, applied to the connect, to every send and to every receive, so a silent daemon surfaces as ``DockerClientError/requestTimedOut(path:)`` instead of as a hang. Cancelling the surrounding task is the other way out: a blocked call cannot observe that by itself, so the socket is shut down through ``CancellableSocket`` to wake it, and the request ends as a `CancellationError`.
+///
 struct DockerEngineClient {
+    ///
+    /// How long a request tolerates silence from the Docker Engine when it does not ask for something else.
+    ///
+    /// The bound is on the gap between bytes rather than on the whole request, because the responses this client reads have no length known in advance: an image pull streams progress for as long as it takes, and an attached command streams output until it exits. What separates those from a stalled daemon is not how long they last but whether anything is still arriving.
+    ///
+    static let defaultRequestTimeout: TimeInterval = 60
+
     ///
     /// The file-system path to the Docker Engine Unix domain socket.
     ///
@@ -33,35 +42,35 @@ struct DockerEngineClient {
     ///
     /// Send a `POST` request with a JSON-encoded body.
     ///
-    func post(path: String, body: some Encodable) async throws -> (statusCode: Int, body: Data) {
+    func post(path: String, body: some Encodable, timeout: TimeInterval? = defaultRequestTimeout) async throws -> (statusCode: Int, body: Data) {
         let data = try JSONEncoder().encode(body)
-        return try await send(method: "POST", path: path, body: data)
+        return try await send(method: "POST", path: path, body: data, timeout: timeout)
     }
 
     ///
     /// Send a `POST` request with no body.
     ///
-    func post(path: String) async throws -> (statusCode: Int, body: Data) {
-        try await send(method: "POST", path: path, body: nil)
+    func post(path: String, timeout: TimeInterval? = defaultRequestTimeout) async throws -> (statusCode: Int, body: Data) {
+        try await send(method: "POST", path: path, body: nil, timeout: timeout)
     }
 
     ///
     /// Send a `GET` request with no body.
     ///
-    func get(path: String) async throws -> (statusCode: Int, body: Data) {
-        try await send(method: "GET", path: path, body: nil)
+    func get(path: String, timeout: TimeInterval? = defaultRequestTimeout) async throws -> (statusCode: Int, body: Data) {
+        try await send(method: "GET", path: path, body: nil, timeout: timeout)
     }
 
     ///
     /// Send a `DELETE` request with no body.
     ///
-    func delete(path: String) async throws -> (statusCode: Int, body: Data) {
-        try await send(method: "DELETE", path: path, body: nil)
+    func delete(path: String, timeout: TimeInterval? = defaultRequestTimeout) async throws -> (statusCode: Int, body: Data) {
+        try await send(method: "DELETE", path: path, body: nil, timeout: timeout)
     }
 
     // MARK: - Core send
 
-    private func send(method: String, path: String, body: Data?) async throws -> (statusCode: Int, body: Data) {
+    private func send(method: String, path: String, body: Data?, timeout: TimeInterval?) async throws -> (statusCode: Int, body: Data) {
         var requestText = "\(method) \(path) HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n"
 
         if let body {
@@ -83,26 +92,102 @@ struct DockerEngineClient {
 
         let socketPath = socketPath // capture value, not self
 
-        return try await withCheckedThrowingContinuation { continuation in
-            // Dispatch to a GCD thread so the blocking POSIX calls
-            // don't stall the Swift concurrency cooperative thread pool.
-            DispatchQueue.global(qos: .utility).async {
-                do {
-                    let result = try dockerSocketRequest(socketPath: socketPath, requestData: requestData)
-                    continuation.resume(returning: result)
-                } catch {
-                    continuation.resume(throwing: error)
+        // The blocking calls below cannot observe task cancellation on their own, so the socket is handed to the cancellation handler, which shuts it down to wake them.
+        let socket = CancellableSocket()
+
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                // Dispatch to a GCD thread so the blocking POSIX calls
+                // don't stall the Swift concurrency cooperative thread pool.
+                DispatchQueue.global(qos: .utility).async {
+                    do {
+                        let result = try dockerSocketRequest(socketPath: socketPath, path: path, requestData: requestData, timeout: timeout, socket: socket)
+                        continuation.resume(returning: result)
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
                 }
             }
+        } onCancel: {
+            socket.cancel()
         }
     }
 }
 
 // MARK: - POSIX-socket transport (file-private free functions)
 
+///
+/// Applies a timeout to everything the socket blocks on.
+///
+/// A `timeval` of zero means "no timeout" to the kernel, and an interval that is not a finite positive number cannot be expressed as one at all, so both are left as the unbounded blocking the socket already has — which is what a caller asking for no deadline wants.
+///
+private func applySocketTimeout(_ fileDescriptor: Int32, _ timeout: TimeInterval?) {
+    guard let timeout, timeout.isFinite, timeout > 0 else {
+        return
+    }
+
+    let bounded = min(timeout, TimeInterval(Int32.max))
+    let seconds = bounded.rounded(.down)
+    var interval = timeval(tv_sec: Int(seconds), tv_usec: suseconds_t((bounded - seconds) * 1_000_000))
+
+    withUnsafePointer(to: &interval) { pointer in
+        _ = setsockopt(fileDescriptor, SOL_SOCKET, SO_RCVTIMEO, pointer, socklen_t(MemoryLayout<timeval>.size))
+        _ = setsockopt(fileDescriptor, SOL_SOCKET, SO_SNDTIMEO, pointer, socklen_t(MemoryLayout<timeval>.size))
+    }
+}
+
+///
+/// Connects the socket, giving up once the timeout has passed.
+///
+/// The connect is performed non-blocking and waited on with `poll`, because a receive timeout does not cover establishing the connection: a socket file that exists but has nobody listening on it would otherwise block here rather than at the first read.
+///
+private func connectSocket(_ fileDescriptor: Int32, to address: inout sockaddr_un, path: String, timeout: TimeInterval?) throws {
+    let flags = fcntl(fileDescriptor, F_GETFL, 0)
+    _ = fcntl(fileDescriptor, F_SETFL, flags | O_NONBLOCK)
+
+    defer { _ = fcntl(fileDescriptor, F_SETFL, flags) }
+
+    let result = withUnsafePointer(to: &address) { pointer in
+        pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+            connect(fileDescriptor, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+        }
+    }
+
+    if result == 0 {
+        return
+    }
+
+    guard errno == EINPROGRESS else {
+        throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+    }
+
+    var descriptor = pollfd(fd: fileDescriptor, events: Int16(POLLOUT), revents: 0)
+    let milliseconds: Int32 = timeout.flatMap { $0.isFinite && $0 > 0 ? Int32(min($0 * 1000, TimeInterval(Int32.max))) : nil } ?? -1
+    let ready = poll(&descriptor, 1, milliseconds)
+
+    if ready == 0 {
+        throw DockerClientError.requestTimedOut(path: path)
+    }
+
+    guard ready > 0 else {
+        throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+    }
+
+    var pending: Int32 = 0
+    var size = socklen_t(MemoryLayout<Int32>.size)
+    _ = getsockopt(fileDescriptor, SOL_SOCKET, SO_ERROR, &pending, &size)
+
+    guard pending == 0 else {
+        throw NSError(domain: NSPOSIXErrorDomain, code: Int(pending))
+    }
+}
+
 private func dockerSocketRequest(
     socketPath: String,
-    requestData: Data
+    path: String,
+    requestData: Data,
+    timeout: TimeInterval?,
+    socket cancellation: CancellableSocket
 ) throws -> (statusCode: Int, body: Data) {
     // ── 1. Open a Unix-domain stream socket ─────────────────────────────────
     let fd = socket(AF_UNIX, SOCK_STREAM, 0)
@@ -111,7 +196,15 @@ private func dockerSocketRequest(
         throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
     }
 
-    defer { close(fd) }
+    // The descriptor is given up before it is closed, so a cancellation that arrives late finds nothing to shut down rather than a number the kernel has reissued.
+    defer {
+        cancellation.release()
+        close(fd)
+    }
+
+    guard cancellation.adopt(fd) else {
+        throw CancellationError()
+    }
 
     // ── 2. Connect to the Docker socket path ─────────────────────────────────
     var addr = sockaddr_un()
@@ -121,15 +214,9 @@ private func dockerSocketRequest(
             _ = memcpy(bytes.baseAddress!, src, strlen(src) + 1)
         }
     }
-    let connectResult = withUnsafePointer(to: &addr) { addrPtr in
-        addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-            connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
-        }
-    }
 
-    guard connectResult == 0 else {
-        throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
-    }
+    try connectSocket(fd, to: &addr, path: path, timeout: timeout)
+    applySocketTimeout(fd, timeout)
 
     // ── 3. Send the full HTTP request ────────────────────────────────────────
     var totalSent = 0
@@ -139,11 +226,26 @@ private func dockerSocketRequest(
             send(fd, ptr.baseAddress!.advanced(by: totalSent), ptr.count - totalSent, 0)
         }
 
-        guard sent > 0 else {
-            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        if sent > 0 {
+            totalSent += sent
+
+            continue
         }
 
-        totalSent += sent
+        // A shutdown from the cancellation handler surfaces here as an ordinary failure, so cancellation is checked before the errno is interpreted.
+        if cancellation.isCancelled {
+            throw CancellationError()
+        }
+
+        // A send that reports no progress is either an interruption to retry, the timeout expiring, or a genuine failure — telling them apart is what keeps a stalled daemon from looking like a truncated request.
+        switch errno {
+            case EINTR:
+                continue
+            case EAGAIN, EWOULDBLOCK:
+                throw DockerClientError.requestTimedOut(path: path)
+            default:
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
     }
 
     // ── 4. Read until the server closes the connection (Connection: close) ───
@@ -151,15 +253,34 @@ private func dockerSocketRequest(
     var buffer = [UInt8](repeating: 0, count: 8192)
 
     while true {
-        let n = buffer.withUnsafeMutableBytes { ptr in
+        let received = buffer.withUnsafeMutableBytes { ptr in
             recv(fd, ptr.baseAddress!, ptr.count, 0)
         }
 
-        if n <= 0 {
+        if received > 0 {
+            responseData.append(buffer, count: received)
+
+            continue
+        }
+
+        // A shutdown from the cancellation handler ends the read, and it does so as an orderly close, so cancellation has to be ruled out before a zero is believed — otherwise an interrupted request would hand back whatever had arrived so far as if it were the whole response.
+        if cancellation.isCancelled {
+            throw CancellationError()
+        }
+
+        // Zero is the orderly close that ends every response; anything else has to be distinguished the same way as on the sending side, because treating a timeout as the end of the body would hand back a half-read response as if it were complete.
+        if received == 0 {
             break
         }
 
-        responseData.append(buffer, count: n)
+        switch errno {
+            case EINTR:
+                continue
+            case EAGAIN, EWOULDBLOCK:
+                throw DockerClientError.requestTimedOut(path: path)
+            default:
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
     }
 
     // ── 5. Parse the HTTP response ───────────────────────────────────────────

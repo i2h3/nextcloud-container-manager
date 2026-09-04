@@ -9,9 +9,9 @@ You are an experienced software engineer working on native apps for iOS and macO
 
 The `NextcloudContainerManager` library target groups its source files into folders by concern (one level deep):
 
-- `Manager/` holds the `NextcloudContainerManager` enum and its feature extensions (`+AppManagement`, `+UserManagement`, `+CommandExecution`, `+Provisioning`, `+HighPerformanceBackend`, `+Logs`), one feature group per file.
-- `PublicTypes/` holds the remaining public types (`NextcloudConfiguration`, `NextcloudContainer`, `NextcloudContainerManagerError`).
-- `DockerClient/` holds the Docker Engine client and its supporting utilities (`DockerEngineClient`, `DockerClientError`, `findFreePort`, `ensurePortIsFree`, `validateContainerName`, `ensureContainerNameIsFree`, `containerName`, `firstFileInTarArchive`, `demultiplexDockerStream`).
+- `Manager/` holds the `NextcloudContainerManager` enum and its feature extensions (`+AppManagement`, `+UserManagement`, `+CommandExecution`, `+Suspension`, `+Provisioning`, `+HighPerformanceBackend`, `+Logs`), one feature group per file.
+- `PublicTypes/` holds the remaining public types (`NextcloudConfiguration`, `NextcloudContainer`, `NextcloudContainerManagerError`, `CommandResult`).
+- `DockerClient/` holds the Docker Engine client and its supporting utilities (`DockerEngineClient`, `DockerClientError`, `CancellableSocket`, `findFreePort`, `ensurePortIsFree`, `validateContainerName`, `ensureContainerNameIsFree`, `containerName`, `firstFileInTarArchive`, `demultiplexDockerStream`).
 - `Requests/` and `Responses/` hold the Docker Engine and Nextcloud request and response body models.
 - `Documentation.docc/` holds the DocC catalog.
 
