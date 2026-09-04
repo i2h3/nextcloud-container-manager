@@ -14,12 +14,10 @@ extension NextcloudContainerManager {
     ///
     /// After waiting for the Nextcloud instance to finish its initial installation, this disables the apps listed in ``NextcloudConfiguration/disabledApps``, enables the apps listed in ``NextcloudConfiguration/enabledApps`` (installing them first when necessary), creates the users listed in ``NextcloudConfiguration/users``, and finally sets up the High Performance Backend for Files when ``NextcloudConfiguration/pushNotifications`` is enabled.
     ///
+    /// The wait happens for every deployment, including one whose configuration declares no steps at all. Readiness is not one of the steps but the precondition for all of them, and for anything the caller does with the container afterwards: ``deploy(configuration:)`` is documented as returning an instance that is ready, so a configuration that happens to be empty must not be the reason a caller receives a container whose Nextcloud installer is still running.
+    ///
     static func provision(_ container: NextcloudContainer) async throws {
         let configuration = container.configuration
-
-        guard !configuration.disabledApps.isEmpty || !configuration.enabledApps.isEmpty || !configuration.users.isEmpty || configuration.pushNotifications else {
-            return
-        }
 
         try await waitUntilReady(port: container.port)
 

@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Iva Horn
 // SPDX-License-Identifier: MIT
 
+import Foundation
+
 ///
 /// User management for ``NextcloudContainerManager``.
 ///
@@ -14,12 +16,13 @@ public extension NextcloudContainerManager {
     ///
     /// - Parameters:
     ///     - user: The user identifier expected by the `occ` command line.
+    ///     - timeout: How long to wait for the command to finish, or `nil` to wait for as long as it takes. Defaults to ``defaultCommandTimeout``.
     ///     - id: The Docker container identifier to run the command in.
     ///
-    /// - Throws: A `DockerClientError` if the command cannot be run or exits with a non-zero status.
+    /// - Throws: A `DockerClientError` if the command cannot be run, does not finish within `timeout`, or exits with a non-zero status.
     ///
-    static func addUser(_ user: String, inContainer id: String) async throws {
-        try await runOCC(["user:add", "--password-from-env", user], environment: ["OC_PASS=\(user)"], inContainer: id)
+    static func addUser(_ user: String, timeout: TimeInterval? = defaultCommandTimeout, inContainer id: String) async throws {
+        try await runOCC(["user:add", "--password-from-env", user], environment: ["OC_PASS=\(user)"], timeout: timeout, inContainer: id)
     }
 
     ///
@@ -27,12 +30,13 @@ public extension NextcloudContainerManager {
     ///
     /// - Parameters:
     ///     - user: The user identifier expected by the `occ` command line.
+    ///     - timeout: How long to wait for the command to finish, or `nil` to wait for as long as it takes. Defaults to ``defaultCommandTimeout``.
     ///     - id: The Docker container identifier to run the command in.
     ///
-    /// - Throws: A `DockerClientError` if the command cannot be run or exits with a non-zero status.
+    /// - Throws: A `DockerClientError` if the command cannot be run, does not finish within `timeout`, or exits with a non-zero status.
     ///
-    static func removeUser(_ user: String, inContainer id: String) async throws {
-        try await runOCC(["user:delete", user], inContainer: id)
+    static func removeUser(_ user: String, timeout: TimeInterval? = defaultCommandTimeout, inContainer id: String) async throws {
+        try await runOCC(["user:delete", user], timeout: timeout, inContainer: id)
     }
 
     ///
@@ -40,12 +44,13 @@ public extension NextcloudContainerManager {
     ///
     /// - Parameters:
     ///     - user: The user identifier expected by the `occ` command line.
+    ///     - timeout: How long to wait for the command to finish, or `nil` to wait for as long as it takes. Defaults to ``defaultCommandTimeout``.
     ///     - id: The Docker container identifier to run the command in.
     ///
-    /// - Throws: A `DockerClientError` if the command cannot be run or exits with a non-zero status.
+    /// - Throws: A `DockerClientError` if the command cannot be run, does not finish within `timeout`, or exits with a non-zero status.
     ///
-    static func enableUser(_ user: String, inContainer id: String) async throws {
-        try await runOCC(["user:enable", user], inContainer: id)
+    static func enableUser(_ user: String, timeout: TimeInterval? = defaultCommandTimeout, inContainer id: String) async throws {
+        try await runOCC(["user:enable", user], timeout: timeout, inContainer: id)
     }
 
     ///
@@ -53,11 +58,12 @@ public extension NextcloudContainerManager {
     ///
     /// - Parameters:
     ///     - user: The user identifier expected by the `occ` command line.
+    ///     - timeout: How long to wait for the command to finish, or `nil` to wait for as long as it takes. Defaults to ``defaultCommandTimeout``.
     ///     - id: The Docker container identifier to run the command in.
     ///
-    /// - Throws: A `DockerClientError` if the command cannot be run or exits with a non-zero status.
+    /// - Throws: A `DockerClientError` if the command cannot be run, does not finish within `timeout`, or exits with a non-zero status.
     ///
-    static func disableUser(_ user: String, inContainer id: String) async throws {
-        try await runOCC(["user:disable", user], inContainer: id)
+    static func disableUser(_ user: String, timeout: TimeInterval? = defaultCommandTimeout, inContainer id: String) async throws {
+        try await runOCC(["user:disable", user], timeout: timeout, inContainer: id)
     }
 }

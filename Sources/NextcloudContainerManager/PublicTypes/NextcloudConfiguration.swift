@@ -22,21 +22,23 @@ public struct NextcloudConfiguration: Sendable {
     ///
     /// App identifiers to disable after the Nextcloud instance is ready.
     ///
-    /// Each identifier is passed to ``NextcloudContainerManager/disableApp(_:inContainer:)`` during provisioning.
+    /// Each identifier is passed to ``NextcloudContainerManager/disableApp(_:timeout:inContainer:)`` during provisioning.
     ///
     public let disabledApps: [String]
 
     ///
     /// App identifiers to enable after the Nextcloud instance is ready, installing them first when they are not present yet.
     ///
-    /// Each identifier is passed to ``NextcloudContainerManager/enableApp(_:inContainer:)`` during provisioning and, when the app is not installed yet, additionally to ``NextcloudContainerManager/addApp(_:inContainer:)``. Apps that are enabled by default and not listed in ``disabledApps`` are left as they are.
+    /// Each identifier is passed to ``NextcloudContainerManager/enableApp(_:timeout:inContainer:)`` during provisioning and, when the app is not installed yet, additionally to ``NextcloudContainerManager/addApp(_:timeout:inContainer:)``. Apps that are enabled by default and not listed in ``disabledApps`` are left as they are.
+    ///
+    /// Provisioning uses the default allowances of both functions, so an app the image does not ship already is downloaded from the app store under ``NextcloudContainerManager/defaultAppInstallationTimeout``. That is deliberately not tunable here, because a per-deployment number would have to be guessed before it is known which of the listed apps are missing and how large they are. A caller who needs a different allowance for a particular app leaves it out of this list and calls ``NextcloudContainerManager/addApp(_:timeout:inContainer:)`` with an explicit `timeout`, or with `nil` to wait for as long as the download takes, once ``NextcloudContainerManager/deploy(configuration:)`` has returned.
     ///
     public let enabledApps: [String]
 
     ///
     /// Identifiers of additional users to create after the Nextcloud instance is ready.
     ///
-    /// Each identifier is passed to ``NextcloudContainerManager/addUser(_:inContainer:)`` during provisioning, which reuses the identifier as the account password.
+    /// Each identifier is passed to ``NextcloudContainerManager/addUser(_:timeout:inContainer:)`` during provisioning, which reuses the identifier as the account password.
     ///
     public let users: [String]
 

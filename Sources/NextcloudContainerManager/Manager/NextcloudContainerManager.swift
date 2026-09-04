@@ -49,6 +49,8 @@ public enum NextcloudContainerManager {
     ///
     /// If the Docker Engine socket is not found, this method checks for Docker Desktop at `/Applications/Docker.app` and attempts to launch it, polling for the socket to become available for up to 10 seconds before retrying. If Docker Desktop is not installed or cannot be launched, a ``NextcloudContainerManagerError`` is thrown.
     ///
+    /// The container returned has finished its initial Nextcloud installation and answers requests, whether or not the configuration declares any provisioning steps, so a caller can run `occ` commands against it immediately.
+    ///
     /// When ``NextcloudConfiguration/pushNotifications`` is enabled, a Redis sidecar is deployed on a dedicated network and the High Performance Backend for Files is provisioned, exposing the push endpoint on ``NextcloudContainer/pushPort``. The supporting infrastructure is removed again automatically if any step fails.
     ///
     /// A ``NextcloudConfiguration/name`` given in the configuration names the container instead of letting the Docker Engine generate one. It is validated and checked for being free before anything is created, so a rejected or taken name costs no image pull. Either way the name the container ended up with is reported as ``NextcloudContainer/name``.
