@@ -191,7 +191,20 @@ extension NextcloudContainerManager {
         let deadline = Date().addingTimeInterval(5)
 
         while true {
-            let response = try await client.get(path: "/exec/\(id)/json")
+            // Each request carries what is left of the allowance rather than the transport's own default, because a deadline that only bounds the loop is no deadline at all: one request left unbounded would let a silent Docker Engine hold this call for the length of the default instead, which is precisely the shape of the defect this wait was rewritten to remove.
+            let remaining = deadline.timeIntervalSinceNow
+
+            guard remaining > 0 else {
+                throw DockerClientError.timeout
+            }
+
+            let response: (statusCode: Int, body: Data)
+
+            do {
+                response = try await client.get(path: "/exec/\(id)/json", timeout: max(0.001, remaining))
+            } catch DockerClientError.requestTimedOut {
+                throw DockerClientError.timeout
+            }
 
             // The exec instance disappears together with its container, so a container removed underneath a command has to be reported as the missing resource it is rather than as an undecodable response body.
             guard response.statusCode == 200 else {
@@ -203,10 +216,6 @@ extension NextcloudContainerManager {
 
             if !info.Running {
                 return info.ExitCode ?? 0
-            }
-
-            if Date() >= deadline {
-                throw DockerClientError.timeout
             }
 
             try await Task.sleep(nanoseconds: 50_000_000)

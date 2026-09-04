@@ -56,7 +56,7 @@ print(result.standardOutput)
 Each of them also takes a `timeout` bounding how long the command may produce nothing before it is given up on, defaulting to ``NextcloudContainerManager/defaultCommandTimeout``.
 ``NextcloudContainerManager/addApp(_:timeout:inContainer:)`` is the exception and defaults to the far longer ``NextcloudContainerManager/defaultAppInstallationTimeout``, because installing an app is the one command here that reaches the network: it fetches the app store's catalogue and then downloads and verifies the app archive, so how long it takes is a property of the connection rather than of `occ`.
 Passing `nil` waits for as long as the command takes while still checking its exit status, which is the honest option when the duration cannot be predicted at all.
-An elapsed allowance throws ``NextcloudContainerManagerError/commandTimedOut(command:)`` and does not stop the command, which outlives the request that started it.
+An elapsed allowance throws ``NextcloudContainerManagerError/commandTimedOut(command:)`` and undoes nothing: the deadline can expire before the Docker Engine was asked to start the command at all, and otherwise the command keeps running, because an exec instance outlives the request that started it.
 
 When a test fails, ``NextcloudContainerManager/logFile(inContainer:)`` copies the Nextcloud application log (`data/nextcloud.log`) out of the container into a temporary file and returns its URL — a point-in-time snapshot the same id-only callers can read.
 ``NextcloudContainerManager/accessLogFile(inContainer:)`` does the same for the Apache access log, which records one line per handled request and therefore shows what a failing client actually sent and which status code it was answered with.
