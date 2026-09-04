@@ -196,6 +196,10 @@ private func dockerSocketRequest(
         throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
     }
 
+    // Cancelling shuts this socket down while a send may still be in flight, and sending on a socket that has been shut down raises SIGPIPE, which by default kills the whole process instead of failing the call. Asking the socket to report the condition as an error keeps a cancelled request a failed request.
+    var reportBrokenPipeAsError: Int32 = 1
+    setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &reportBrokenPipeAsError, socklen_t(MemoryLayout<Int32>.size))
+
     // The descriptor is given up before it is closed, so a cancellation that arrives late finds nothing to shut down rather than a number the kernel has reissued.
     defer {
         cancellation.release()

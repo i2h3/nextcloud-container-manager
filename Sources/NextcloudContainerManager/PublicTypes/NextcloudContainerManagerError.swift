@@ -46,7 +46,7 @@ public enum NextcloudContainerManagerError: Error {
     ///
     /// A command run inside a container produced nothing for longer than it was given.
     ///
-    /// The associated value is the command as it was run. The command itself is not stopped by this — an exec instance outlives the request that started it — so a container that is still around may well finish it afterwards.
+    /// The associated value is the command as it was run. Nothing is undone by this: the deadline can expire before the Docker Engine was even asked to start the command, in which case it never ran, and otherwise the command keeps running, because an exec instance outlives the request that started it. So a container that is still around may well finish it afterwards.
     ///
     case commandTimedOut(command: [String])
 

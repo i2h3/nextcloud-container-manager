@@ -10,7 +10,7 @@ public struct CommandResult: Sendable {
     ///
     /// The status the command exited with.
     ///
-    /// A result handed back from a successful call always holds zero, because a non-zero status is thrown as ``NextcloudContainerManagerError/commandFailed(command:result:)`` instead of returned. The value therefore only carries information on the result attached to that error. On the empty result returned for a command that was not waited for it is a placeholder rather than a report, because such a command has not exited by the time the call returns and has no status yet.
+    /// A result handed back from a successful call always holds zero, because a non-zero status is thrown as ``NextcloudContainerManagerError/commandFailed(command:result:)`` instead of returned. The value therefore only carries information on the result attached to that error. A command that is not waited for yields no result at all rather than one with an invented status.
     ///
     public let exitCode: Int
 
