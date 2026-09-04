@@ -31,7 +31,9 @@ enum DockerClientError: Error {
     case commandFailed(command: [String], exitCode: Int)
 
     ///
-    /// The Nextcloud instance did not become ready within the expected time.
+    /// Something that is waited on did not happen within the expected time.
+    ///
+    /// This covers the Nextcloud instance not becoming ready after deployment as well as a command inside the container not finishing within the allowance given to it, which for the command functions on ``NextcloudContainerManager`` is their `timeout` parameter.
     ///
     case timeout
 
