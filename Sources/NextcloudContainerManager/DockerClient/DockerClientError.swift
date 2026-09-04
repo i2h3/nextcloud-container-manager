@@ -26,14 +26,16 @@ enum DockerClientError: Error {
     case imagePullFailed(image: String, message: String)
 
     ///
-    /// A command executed inside the container exited with a non-zero status.
+    /// The Docker Engine accepted a request but then went quiet for longer than the request allowed.
     ///
-    case commandFailed(command: [String], exitCode: Int)
+    /// The associated value is the request path. This is what a stalled daemon looks like from here: the socket stays open with nothing arriving on it, which without a deadline would leave the call waiting forever.
+    ///
+    case requestTimedOut(path: String)
 
     ///
     /// Something that is waited on did not happen within the expected time.
     ///
-    /// This covers the Nextcloud instance not becoming ready after deployment as well as a command inside the container not finishing within the allowance given to it, which for the command functions on ``NextcloudContainerManager`` is their `timeout` parameter.
+    /// This covers the Nextcloud instance not becoming ready after deployment, the push endpoint not answering, and the Docker Engine not recording a command's exit status in the moment after its output stream closed. A command overrunning the allowance given to it is not this — that is ``NextcloudContainerManagerError/commandTimedOut(command:)``.
     ///
     case timeout
 

@@ -7,6 +7,16 @@
 - ``deploy(configuration:)``
 - ``delete(_:)``
 
+### Simulating an outage
+
+- ``pause(_:)``
+- ``resume(_:)``
+
+### Running commands
+
+- ``runOCC(_:environment:timeout:inContainer:)``
+- ``runExec(_:user:workingDirectory:environment:waitsForExit:timeout:inContainer:)``
+
 ### Managing apps
 
 - ``addApp(_:timeout:inContainer:)``

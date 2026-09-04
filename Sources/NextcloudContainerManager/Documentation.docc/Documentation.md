@@ -44,16 +44,30 @@ Every management operation is a stateless function on ``NextcloudContainerManage
 Use ``NextcloudContainerManager/addApp(_:timeout:inContainer:)``, ``NextcloudContainerManager/removeApp(_:timeout:inContainer:)``, ``NextcloudContainerManager/enableApp(_:timeout:inContainer:)`` and ``NextcloudContainerManager/disableApp(_:timeout:inContainer:)`` for apps, and ``NextcloudContainerManager/addUser(_:timeout:inContainer:)``, ``NextcloudContainerManager/removeUser(_:timeout:inContainer:)``, ``NextcloudContainerManager/enableUser(_:timeout:inContainer:)`` and ``NextcloudContainerManager/disableUser(_:timeout:inContainer:)`` for users.
 Each maps to an `occ` command executed inside the container, so a failure surfaces as a thrown error rather than a silent no-op.
 
-Each of them also takes a `timeout` bounding how long the command is waited on, defaulting to ``NextcloudContainerManager/defaultCommandTimeout``.
+Anything these functions do not wrap is reachable through ``NextcloudContainerManager/runOCC(_:environment:timeout:inContainer:)``, which runs an arbitrary `occ` subcommand and hands back what it wrote, so a caller does not have to drive the `docker` command line tool alongside this library to reach the rest of `occ`.
+``NextcloudContainerManager/runExec(_:user:workingDirectory:environment:waitsForExit:timeout:inContainer:)`` does the same for a command that is not `occ` at all.
+A non-zero exit throws ``NextcloudContainerManagerError/commandFailed(command:result:)``, which carries the command's own explanation of the refusal rather than only its status.
+
+```swift
+let result = try await NextcloudContainerManager.runOCC(["user:list", "--output=json"], inContainer: container.id)
+print(result.standardOutput)
+```
+
+Each of them also takes a `timeout` bounding how long the command may produce nothing before it is given up on, defaulting to ``NextcloudContainerManager/defaultCommandTimeout``.
 ``NextcloudContainerManager/addApp(_:timeout:inContainer:)`` is the exception and defaults to the far longer ``NextcloudContainerManager/defaultAppInstallationTimeout``, because installing an app is the one command here that reaches the network: it fetches the app store's catalogue and then downloads and verifies the app archive, so how long it takes is a property of the connection rather than of `occ`.
-Passing `nil` waits for as long as the command takes while still checking its exit code, which is the honest option when the duration cannot be predicted at all.
-Whatever the allowance, the command is always inspected at least once, so one that has already finished is never reported as timed out.
+Passing `nil` waits for as long as the command takes while still checking its exit status, which is the honest option when the duration cannot be predicted at all.
+An elapsed allowance throws ``NextcloudContainerManagerError/commandTimedOut(command:)`` and does not stop the command, which outlives the request that started it.
 
 When a test fails, ``NextcloudContainerManager/logFile(inContainer:)`` copies the Nextcloud application log (`data/nextcloud.log`) out of the container into a temporary file and returns its URL — a point-in-time snapshot the same id-only callers can read.
 ``NextcloudContainerManager/accessLogFile(inContainer:)`` does the same for the Apache access log, which records one line per handled request and therefore shows what a failing client actually sent and which status code it was answered with.
 ``NextcloudContainerManager/errorLogFile(inContainer:)`` returns the Apache error log next to it, holding what the web server itself reports — startup notices and the failures of requests that died before Nextcloud could log anything about them.
 Inside the container both are symbolic links to the standard output and standard error of the container rather than files, so they are read from its output streams, the same source as `docker logs`.
 Mind that these two trail the container: the Docker Engine hands out what it has captured, and an idle container was observed to withhold its last lines for more than a minute, so read them after the exercise they should cover has run rather than right after a single request.
+
+### Simulating an outage
+
+``NextcloudContainerManager/pause(_:)`` freezes every process in a container and ``NextcloudContainerManager/resume(_:)`` lets them run again.
+This is how a server that has gone away is simulated: these containers remove themselves when they stop, so stopping one destroys the instance, whereas freezing it leaves connections open with nothing coming back — which is what a client experiences as an outage — and resuming carries on from where it was frozen.
 
 ### Pinning the name and the port
 
@@ -98,6 +112,7 @@ The host port the endpoint is reachable on is reported as ``NextcloudContainer/p
 ### Working with a running container
 
 - ``NextcloudContainer``
+- ``CommandResult``
 
 ### Errors
 
