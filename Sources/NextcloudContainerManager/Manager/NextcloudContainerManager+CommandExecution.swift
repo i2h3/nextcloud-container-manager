@@ -100,7 +100,7 @@ extension NextcloudContainerManager {
 
         try response.checked([201])
 
-        return try JSONDecoder().decode(CreateExecResponse.self, from: response.body).Id
+        return try response.decode(CreateExecResponse.self).Id
     }
 
     ///
@@ -199,7 +199,7 @@ extension NextcloudContainerManager {
             // The exec instance disappears together with its container, so a container removed underneath a command has to be reported as the missing resource it is rather than as an undecodable response body.
             try response.checked([200])
 
-            let info = try JSONDecoder().decode(ExecInspectResponse.self, from: response.body)
+            let info = try response.decode(ExecInspectResponse.self)
 
             if !info.Running {
                 // A stopped exec instance always carries a status, so its absence is a malformed response rather than a zero. Reading it as zero would let an incomplete answer pass for a command that succeeded, which is the one direction this must never fail in.

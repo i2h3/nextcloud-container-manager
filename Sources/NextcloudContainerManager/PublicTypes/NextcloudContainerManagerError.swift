@@ -45,7 +45,7 @@ public enum NextcloudContainerManagerError: Error, Equatable, LocalizedError {
     ///
     /// The Docker Engine answered in a shape this package could not read.
     ///
-    /// The associated value is the request path. This is a malformed HTTP response or an archive that is not the tar stream the endpoint promises, rather than a request that was refused — a refusal is ``engineRequestFailed(path:statusCode:message:)``.
+    /// The associated value is the request path. This is a malformed HTTP response, a body that is not the JSON the endpoint promises, or an archive that is not a tar stream — rather than a request that was refused, which is ``engineRequestFailed(path:statusCode:message:)``.
     ///
     case engineResponseUnreadable(path: String)
 
