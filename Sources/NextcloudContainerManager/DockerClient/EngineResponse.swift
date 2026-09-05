@@ -45,6 +45,26 @@ struct EngineResponse {
     ///
     /// - Throws: ``NextcloudContainerManagerError/engineRequestFailed(path:statusCode:message:)`` when the status is not among `acceptable`.
     ///
+    ///
+    /// Decodes the response body, reporting a body that does not fit as this package's own failure.
+    ///
+    /// A `DecodingError` escaping a public function would contradict the contract on ``NextcloudContainerManagerError`` that every failure this package reports is one of its cases, and it would describe the shape of a Swift type rather than the request that produced the answer.
+    ///
+    /// - Parameters:
+    ///     - type: The model to decode the body into.
+    ///
+    /// - Returns: The decoded value.
+    ///
+    /// - Throws: ``NextcloudContainerManagerError/engineResponseUnreadable(path:)`` when the body is not what the endpoint promises.
+    ///
+    func decode<Model: Decodable>(_ type: Model.Type) throws -> Model {
+        do {
+            return try JSONDecoder().decode(type, from: body)
+        } catch {
+            throw NextcloudContainerManagerError.engineResponseUnreadable(path: path)
+        }
+    }
+
     @discardableResult
     func checked(_ acceptable: Set<Int>) throws -> EngineResponse {
         guard acceptable.contains(statusCode) else {

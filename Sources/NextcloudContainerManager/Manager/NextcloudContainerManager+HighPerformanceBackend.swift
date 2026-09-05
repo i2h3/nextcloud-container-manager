@@ -90,7 +90,7 @@ extension NextcloudContainerManager {
     private static func notifyPushBinaryPath() async throws -> String {
         let client = try await makeDockerEngineClient()
         let response = try await client.get(path: "/version")
-        let version = try JSONDecoder().decode(DockerVersionResponse.self, from: response.body)
+        let version = try response.decode(DockerVersionResponse.self)
 
         let architecture: String
 
@@ -288,7 +288,7 @@ extension NextcloudContainerManager {
             return nil
         }
 
-        let inspect = try JSONDecoder().decode(ContainerInspectResponse.self, from: response.body)
+        let inspect = try response.decode(ContainerInspectResponse.self)
 
         return inspect.Config.Labels?[deploymentLabelKey]
     }

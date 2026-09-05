@@ -21,7 +21,7 @@ func containerName(of id: String, using client: DockerEngineClient) async throws
 
     try response.checked([200])
 
-    let inspect = try JSONDecoder().decode(ContainerInspectResponse.self, from: response.body)
+    let inspect = try response.decode(ContainerInspectResponse.self)
 
     return String(inspect.Name.drop(while: { $0 == "/" }))
 }

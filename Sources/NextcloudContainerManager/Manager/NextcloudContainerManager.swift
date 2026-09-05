@@ -151,7 +151,7 @@ public enum NextcloudContainerManager {
 
             try createResponse.checked([201])
 
-            let created = try JSONDecoder().decode(CreateContainerResponse.self, from: createResponse.body)
+            let created = try createResponse.decode(CreateContainerResponse.self)
             createdId = created.Id
 
             let startResponse = try await client.post(path: "/containers/\(created.Id)/start")

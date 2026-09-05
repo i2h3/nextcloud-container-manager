@@ -121,7 +121,7 @@ struct DockerEngineClient {
 ///
 /// A `timeval` of zero means "no timeout" to the kernel, and an interval that is not a finite positive number cannot be expressed as one at all, so both are left as the unbounded blocking the socket already has — which is what a caller asking for no deadline wants.
 ///
-private func applySocketTimeout(_ fileDescriptor: Int32, _ timeout: TimeInterval?) {
+private func applySocketTimeout(_ fileDescriptor: Int32, _ timeout: TimeInterval?) throws {
     guard let timeout, timeout.isFinite, timeout > 0 else {
         return
     }
@@ -130,9 +130,15 @@ private func applySocketTimeout(_ fileDescriptor: Int32, _ timeout: TimeInterval
     let seconds = bounded.rounded(.down)
     var interval = timeval(tv_sec: Int(seconds), tv_usec: suseconds_t((bounded - seconds) * 1_000_000))
 
-    withUnsafePointer(to: &interval) { pointer in
-        _ = setsockopt(fileDescriptor, SOL_SOCKET, SO_RCVTIMEO, pointer, socklen_t(MemoryLayout<timeval>.size))
-        _ = setsockopt(fileDescriptor, SOL_SOCKET, SO_SNDTIMEO, pointer, socklen_t(MemoryLayout<timeval>.size))
+    // Every deadline this client offers rests on these two options being installed, so a refusal is reported rather than discarded: carrying on would leave the socket blocking forever while the caller believes it is bounded.
+    for option in [SO_RCVTIMEO, SO_SNDTIMEO] {
+        let applied = withUnsafePointer(to: &interval) { pointer in
+            setsockopt(fileDescriptor, SOL_SOCKET, option, pointer, socklen_t(MemoryLayout<timeval>.size))
+        }
+
+        guard applied == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
     }
 }
 
@@ -196,9 +202,12 @@ private func dockerSocketRequest(socketPath: String, path: String, requestData: 
         throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
     }
 
-    // Cancelling shuts this socket down while a send may still be in flight, and sending on a socket that has been shut down raises SIGPIPE, which by default kills the whole process instead of failing the call. Asking the socket to report the condition as an error keeps a cancelled request a failed request.
+    // Cancelling shuts this socket down while a send may still be in flight, and sending on a socket that has been shut down raises SIGPIPE, which by default kills the whole process instead of failing the call. Asking the socket to report the condition as an error keeps a cancelled request a failed request, and a refusal is fatal to the request rather than ignored, because carrying on would risk the process itself.
     var reportBrokenPipeAsError: Int32 = 1
-    setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &reportBrokenPipeAsError, socklen_t(MemoryLayout<Int32>.size))
+
+    guard setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &reportBrokenPipeAsError, socklen_t(MemoryLayout<Int32>.size)) == 0 else {
+        throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+    }
 
     // The descriptor is given up before it is closed, so a cancellation that arrives late finds nothing to shut down rather than a number the kernel has reissued.
     defer {
@@ -220,7 +229,7 @@ private func dockerSocketRequest(socketPath: String, path: String, requestData: 
     }
 
     try connectSocket(fd, to: &addr, path: path, timeout: timeout)
-    applySocketTimeout(fd, timeout)
+    try applySocketTimeout(fd, timeout)
 
     // ── 3. Send the full HTTP request ────────────────────────────────────────
     var totalSent = 0
@@ -257,6 +266,11 @@ private func dockerSocketRequest(socketPath: String, path: String, requestData: 
     var buffer = [UInt8](repeating: 0, count: 8192)
 
     while true {
+        // Reading until the peer hangs up is only correct while it does hang up. When a response carries its own length — a Content-Length, a terminating chunk, or a status defined to have no body — waiting for a close that may never come would turn a complete answer into a timeout. The Docker Engine does close today, because this client asks it to, and round trips were measured at the same speed either way; this is about not depending on it.
+        if httpResponseIsComplete(responseData) {
+            break
+        }
+
         let received = buffer.withUnsafeMutableBytes { ptr in
             recv(fd, ptr.baseAddress!, ptr.count, 0)
         }
@@ -293,6 +307,100 @@ private func dockerSocketRequest(socketPath: String, path: String, requestData: 
     }
 
     return parsed
+}
+
+///
+/// Whether the bytes received so far are a whole HTTP response.
+///
+/// The Docker Engine frames its answers three ways: a `Content-Length`, a chunked body ending in a zero-length chunk, and a status that is defined to carry no body at all. An attached command stream is the fourth case and carries none of them — it ends when the command does — so a response whose framing cannot be read is reported as incomplete and left to the connection to finish.
+///
+/// - Parameters:
+///     - data: Everything received on the socket so far.
+///
+/// - Returns: Whether reading can stop without waiting for the peer to close.
+///
+private func httpResponseIsComplete(_ data: Data) -> Bool {
+    guard let separator = data.range(of: Data("\r\n\r\n".utf8)) else {
+        return false
+    }
+
+    guard let headerText = String(data: data[..<separator.lowerBound], encoding: .utf8) else {
+        return false
+    }
+
+    let lines = headerText.components(separatedBy: "\r\n")
+    let body = data[separator.upperBound...]
+
+    // 204 and 304 are defined to carry no body, so their headers are the whole answer.
+    if let statusLine = lines.first {
+        let parts = statusLine.split(separator: " ", maxSplits: 2)
+
+        if parts.count >= 2, let statusCode = Int(parts[1]), statusCode == 204 || statusCode == 304 {
+            return true
+        }
+    }
+
+    if headerText.lowercased().contains("transfer-encoding: chunked") {
+        return chunkedBodyIsComplete(body)
+    }
+
+    for line in lines.dropFirst() {
+        let pieces = line.split(separator: ":", maxSplits: 1)
+
+        guard pieces.count == 2, pieces[0].trimmingCharacters(in: .whitespaces).lowercased() == "content-length" else {
+            continue
+        }
+
+        guard let length = Int(pieces[1].trimmingCharacters(in: .whitespaces)) else {
+            return false
+        }
+
+        return body.count >= length
+    }
+
+    return false
+}
+
+///
+/// Whether a chunked body has reached its terminating zero-length chunk.
+///
+/// - Parameters:
+///     - body: The body received so far, starting at its first chunk header.
+///
+/// - Returns: Whether the terminating chunk has arrived.
+///
+private func chunkedBodyIsComplete(_ body: Data) -> Bool {
+    var position = body.startIndex
+    let crlf = Data("\r\n".utf8)
+
+    while position < body.endIndex {
+        guard let lineEnd = body[position...].range(of: crlf) else {
+            return false
+        }
+
+        guard let text = String(data: body[position ..< lineEnd.lowerBound], encoding: .ascii) else {
+            return false
+        }
+
+        // A chunk header may carry extensions after a semicolon, which are not part of the size.
+        let sizeText = text.split(separator: ";").first.map(String.init) ?? text
+
+        guard let size = Int(sizeText.trimmingCharacters(in: .whitespaces), radix: 16) else {
+            return false
+        }
+
+        if size == 0 {
+            return true
+        }
+
+        guard let next = body.index(lineEnd.upperBound, offsetBy: size + 2, limitedBy: body.endIndex) else {
+            return false
+        }
+
+        position = next
+    }
+
+    return false
 }
 
 private func parseHTTPResponse(_ data: Data, path: String) -> EngineResponse? {
