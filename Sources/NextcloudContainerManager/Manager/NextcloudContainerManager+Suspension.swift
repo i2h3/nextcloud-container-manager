@@ -14,6 +14,8 @@ public extension NextcloudContainerManager {
     ///
     /// This is how a server that has gone away is simulated. Stopping the container is not the way to do it: containers deployed by this package remove themselves when they stop, so stopping one destroys the instance and everything in it. Suspending freezes it in place instead, which is what a connected client experiences as a server that stopped answering — connections stay open and nothing comes back — and ``resume(_:)`` brings it back with its state intact.
     ///
+    /// A paused container can still be torn down with ``delete(_:)`` and does not have to be resumed first, but it takes longer: a frozen process cannot act on the signal asking it to shut down, so the Docker Engine waits out its stop timeout — ten seconds by default — before killing it.
+    ///
     /// - Parameters:
     ///     - id: The Docker container identifier or name returned by ``deploy(configuration:)``.
     ///

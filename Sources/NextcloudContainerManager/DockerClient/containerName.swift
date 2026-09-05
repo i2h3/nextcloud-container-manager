@@ -14,7 +14,7 @@ import Foundation
 ///
 /// - Returns: The container name without its leading slash.
 ///
-/// - Throws: Another case of ``nextcloudcontainermanagererror`` for a docker engine request that fails, times out or cannot be made.
+/// - Throws: ``NextcloudContainerManagerError/engineRequestFailed(path:statusCode:message:)`` when the Docker Engine does not report the container, or another case of ``NextcloudContainerManagerError`` for a Docker Engine request that fails, times out or cannot be made.
 ///
 func containerName(of id: String, using client: DockerEngineClient) async throws -> String {
     let response = try await client.get(path: "/containers/\(id)/json")

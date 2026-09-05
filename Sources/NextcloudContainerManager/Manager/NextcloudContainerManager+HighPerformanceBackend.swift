@@ -241,7 +241,9 @@ extension NextcloudContainerManager {
         let deadline = Date().addingTimeInterval(10)
 
         while true {
-            let response = try await client.delete(path: "/networks/\(name)")
+            // The allowance bounds each request and not merely the loop around it, because one request left on the transport's own default would outlast the retry window it is supposed to fit inside.
+            let remaining = deadline.timeIntervalSinceNow
+            let response = try await client.delete(path: "/networks/\(name)", timeout: max(0.001, remaining))
 
             if [204, 404].contains(response.statusCode) {
                 return

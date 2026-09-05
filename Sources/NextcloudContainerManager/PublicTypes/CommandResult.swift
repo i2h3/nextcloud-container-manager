@@ -36,7 +36,7 @@ public struct CommandResult: Sendable, Equatable {
     ///     - standardOutput: What the command wrote to its standard output.
     ///     - standardError: What the command wrote to its standard error.
     ///
-    init(exitCode: Int, standardOutput: String, standardError: String) {
+    public init(exitCode: Int, standardOutput: String, standardError: String) {
         self.exitCode = exitCode
         self.standardOutput = standardOutput
         self.standardError = standardError
