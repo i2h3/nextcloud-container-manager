@@ -154,11 +154,7 @@ extension NextcloudContainerManager {
 
         let streams = demultiplexDockerStream(stream.body)
 
-        let result = try await CommandResult(
-            exitCode: exitCode(ofExec: exec, running: command, using: client),
-            standardOutput: String(decoding: streams.standardOutput, as: UTF8.self),
-            standardError: String(decoding: streams.standardError, as: UTF8.self)
-        )
+        let result = try await CommandResult(exitCode: exitCode(ofExec: exec, running: command, using: client), standardOutput: String(decoding: streams.standardOutput, as: UTF8.self), standardError: String(decoding: streams.standardError, as: UTF8.self))
 
         guard result.exitCode == 0 else {
             throw NextcloudContainerManagerError.commandFailed(command: command, result: result)

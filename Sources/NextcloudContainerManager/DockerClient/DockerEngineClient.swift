@@ -188,13 +188,7 @@ private func connectSocket(_ fileDescriptor: Int32, to address: inout sockaddr_u
     }
 }
 
-private func dockerSocketRequest(
-    socketPath: String,
-    path: String,
-    requestData: Data,
-    timeout: TimeInterval?,
-    socket cancellation: CancellableSocket
-) throws -> EngineResponse {
+private func dockerSocketRequest(socketPath: String, path: String, requestData: Data, timeout: TimeInterval?, socket cancellation: CancellableSocket) throws -> EngineResponse {
     // ── 1. Open a Unix-domain stream socket ─────────────────────────────────
     let fd = socket(AF_UNIX, SOCK_STREAM, 0)
 

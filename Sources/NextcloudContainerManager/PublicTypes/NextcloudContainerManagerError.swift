@@ -36,9 +36,9 @@ public enum NextcloudContainerManagerError: Error, Equatable, LocalizedError {
     case engineRequestFailed(path: String, statusCode: Int, message: String)
 
     ///
-    /// The Docker Engine accepted a request and then went quiet for longer than the request allowed.
+    /// A request to the Docker Engine did not complete within the time it was allowed.
     ///
-    /// The associated value is the request path. This is what a stalled daemon looks like from here — the socket stays open with nothing arriving on it — and it is what bounds a call that would otherwise wait forever.
+    /// The associated value is the request path. The deadline covers connecting, sending and reading, so this says nothing about how far the request got: it may have expired before the Docker Engine ever saw it, in which case nothing was done, or while waiting for an answer to a request it had already acted on. A caller that needs to know which must look at the state the request would have changed.
     ///
     case engineRequestTimedOut(path: String)
 
