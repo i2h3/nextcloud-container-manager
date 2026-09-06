@@ -75,7 +75,22 @@ extension NextcloudContainerManager {
         try await waitUntilPushReady(port: pushPort)
 
         // 5. Register the push endpoint, which runs the app's self-test and only succeeds when every check passes.
-        try await runOCC(["notify_push:setup", "http://localhost:\(pushPort)"], inContainer: container.id)
+        // The self-test is retried rather than run once, because installing the app and the web server serving its routes are not the same moment: the daemon's own probes were observed answering 404 for about a second after `app:install` had already reported success, which is long enough for a caller to lose the race and short enough that anything slower than this library never noticed.
+        let deadline = Date().addingTimeInterval(30)
+
+        while true {
+            do {
+                try await runOCC(["notify_push:setup", "http://localhost:\(pushPort)"], inContainer: container.id)
+
+                return
+            } catch let error as NextcloudContainerManagerError {
+                guard case .commandFailed = error, Date() < deadline else {
+                    throw error
+                }
+
+                try await Task.sleep(nanoseconds: 500_000_000)
+            }
+        }
     }
 
     ///
