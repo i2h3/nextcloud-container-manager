@@ -12,6 +12,8 @@ Talk to the [Docker Engine API](https://docs.docker.com/reference/api/engine/) o
 
 It can optionally enable the High Performance Backend for Files (`notify_push`) so connected clients receive websocket push notifications instead of polling.
 
+Deployed containers are published on the loopback address only, so they are reachable from the machine running them and not from other devices on the network.
+
 ## Who is this for?
 
 This package targets developers working on native Nextcloud client apps.

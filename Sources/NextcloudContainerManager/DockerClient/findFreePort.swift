@@ -4,11 +4,11 @@
 import Darwin
 
 ///
-/// Ask the kernel for a free TCP port by binding to port 0, reading back the assigned port, and then immediately releasing the socket.
+/// Ask the kernel for a free TCP port by binding to port 0 on the loopback address, reading back the assigned port, and then immediately releasing the socket.
 ///
 /// There is a small TOCTOU window between releasing the socket and Docker binding to the port, which is acceptable for test-container use.
 ///
-/// - Returns: A free port number on the local host.
+/// - Returns: A port number free on the loopback address, which is the address ``NextcloudContainerManager/deploy(configuration:)`` publishes container ports on.
 /// - Throws: ``NextcloudContainerManagerError/couldNotAllocatePort`` when the kernel does not grant a socket or assign a port.
 ///
 func findFreePort() throws -> UInt16 {
@@ -24,7 +24,7 @@ func findFreePort() throws -> UInt16 {
     addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
     addr.sin_family = sa_family_t(AF_INET)
     addr.sin_port = 0
-    addr.sin_addr = in_addr(s_addr: INADDR_ANY)
+    addr.sin_addr = in_addr(s_addr: INADDR_LOOPBACK.bigEndian)
 
     let bindResult = withUnsafeMutablePointer(to: &addr) {
         $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {

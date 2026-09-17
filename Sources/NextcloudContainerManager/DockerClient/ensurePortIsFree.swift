@@ -4,7 +4,9 @@
 import Darwin
 
 ///
-/// Verify that a host port can be bound, so that a deployment which requested it fails with a clear reason rather than with a Docker error about a port binding.
+/// Verify that a host port can be bound on the loopback address, so that a deployment which requested it fails with a clear reason rather than with a Docker error about a port binding.
+///
+/// The loopback address is probed rather than every interface, because that is where ``NextcloudContainerManager/deploy(configuration:)`` publishes container ports. Probing every interface would reject a port that is free where the container will actually take it and busy only on an address nothing here uses.
 ///
 /// The check binds the port and releases it again, which leaves the same small window between the check and Docker binding it as ``findFreePort()`` does. That is acceptable for the throwaway containers this package deploys.
 ///
@@ -26,7 +28,7 @@ func ensurePortIsFree(_ port: UInt16) throws {
     addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
     addr.sin_family = sa_family_t(AF_INET)
     addr.sin_port = port.bigEndian
-    addr.sin_addr = in_addr(s_addr: INADDR_ANY)
+    addr.sin_addr = in_addr(s_addr: INADDR_LOOPBACK.bigEndian)
 
     let bindResult = withUnsafeMutablePointer(to: &addr) {
         $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {

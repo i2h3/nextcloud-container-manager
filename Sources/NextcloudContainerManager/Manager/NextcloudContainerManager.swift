@@ -7,6 +7,13 @@ import Foundation
 /// The primary interface of this library.
 ///
 public enum NextcloudContainerManager {
+    ///
+    /// The host address every published container port is bound to.
+    ///
+    /// Loopback rather than the wildcard address, so a deployment is reachable from the host machine only. These containers come up with the well-known administrator account `admin` / `admin`, and an administrator session on a Nextcloud instance is remote code execution because an administrator may install apps. Nothing in this package needs off-host reachability: every URL it builds and every URL it documents is `http://localhost:<port>`.
+    ///
+    static let hostBindAddress = "127.0.0.1"
+
     static func makeDockerEngineClient() async throws -> DockerEngineClient {
         let client: DockerEngineClient
 
@@ -50,6 +57,8 @@ public enum NextcloudContainerManager {
     /// If the Docker Engine socket is not found, this method checks for Docker Desktop at `/Applications/Docker.app` and attempts to launch it, polling for the socket to become available for up to 10 seconds before retrying. If Docker Desktop is not installed or cannot be launched, a ``NextcloudContainerManagerError`` is thrown.
     ///
     /// The container returned has finished its initial Nextcloud installation and answers requests, whether or not the configuration declares any provisioning steps, so a caller can run `occ` commands against it immediately.
+    ///
+    /// Both the HTTP port and, when enabled, the push port are published on the loopback address, so the deployment is reachable from this machine only and not from other devices on the network. That is deliberate and not configurable: the instance comes up with the well-known `admin` / `admin` administrator account, and a Nextcloud administrator may install apps, so an instance published on every interface would offer remote code execution to anything that can reach it.
     ///
     /// When ``NextcloudConfiguration/pushNotifications`` is enabled, a Redis sidecar is deployed on a dedicated network and the High Performance Backend for Files is provisioned, exposing the push endpoint on ``NextcloudContainer/pushPort``. The supporting infrastructure is removed again automatically if any step fails.
     ///
@@ -97,7 +106,7 @@ public enum NextcloudContainerManager {
         var exposedPorts: [String: [String: String]] = ["80/tcp": [:]]
 
         var portBindings: [String: [CreateContainerRequest.PortBinding]] = [
-            "80/tcp": [.init(HostIp: "0.0.0.0", HostPort: "\(port)")],
+            "80/tcp": [.init(HostIp: hostBindAddress, HostPort: "\(port)")],
         ]
 
         var networkMode: String?
@@ -122,7 +131,7 @@ public enum NextcloudContainerManager {
             // Setting REDIS_HOST makes the Nextcloud image configure the distributed cache the push daemon relies on.
             environment.append("REDIS_HOST=\(redisAlias)")
             exposedPorts["\(pushPort)/tcp"] = [:]
-            portBindings["\(pushPort)/tcp"] = [.init(HostIp: "0.0.0.0", HostPort: "\(pushPort)")]
+            portBindings["\(pushPort)/tcp"] = [.init(HostIp: hostBindAddress, HostPort: "\(pushPort)")]
             networkMode = network
             labels = [deploymentLabelKey: deployment]
         }

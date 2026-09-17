@@ -7,9 +7,15 @@ Control the local deployment of ephemeral Nextcloud Docker containers programmat
 `NextcloudContainerManager` talks to the [Docker Engine API](https://docs.docker.com/reference/api/engine/) on macOS to spin up throwaway Nextcloud servers.
 It is built for developers of native Nextcloud client apps who want to run automated tests against a real instance instead of a mock, including full end-to-end tests.
 
-A single call deploys a container, waits until the Nextcloud instance reports itself ready, and forwards it to a free port on the host.
+A single call deploys a container, waits until the Nextcloud instance reports itself ready, and forwards it to a free port on the host's loopback address.
 The instance comes up backed by a SQLite database with the administrator account `admin` / `admin`.
 Containers are created with Docker's auto-remove flag, so stopping one is enough to discard all of its data.
+
+### Reachability
+
+Both the HTTP port and, when enabled, the push port are published on the host's loopback address, so a deployment answers on this machine and nowhere else.
+This is fixed and not configurable.
+The instance comes up with the well-known `admin` / `admin` administrator account, and a Nextcloud administrator may install apps, so an instance published on every interface would offer remote code execution to anything that can reach the machine.
 
 ### Requirements
 
@@ -38,7 +44,7 @@ try await NextcloudContainerManager.delete(container.id)
 
 ### Managing the server
 
-``NextcloudContainerManager/deploy(configuration:)`` returns a ``NextcloudContainer`` — a lightweight value carrying the container's ``NextcloudContainer/id``, its ``NextcloudContainer/name`` and the host ``NextcloudContainer/port`` the server is reachable on.
+``NextcloudContainerManager/deploy(configuration:)`` returns a ``NextcloudContainer`` — a lightweight value carrying the container's ``NextcloudContainer/id``, its ``NextcloudContainer/name`` and the host ``NextcloudContainer/port`` the server is reachable on from this machine.
 
 Every management operation is a stateless function on ``NextcloudContainerManager`` keyed by the container identifier, so callers that only persist an id — for example a Model Context Protocol server — can use them without holding the ``NextcloudContainer`` value.
 Use ``NextcloudContainerManager/addApp(_:timeout:inContainer:)``, ``NextcloudContainerManager/removeApp(_:timeout:inContainer:)``, ``NextcloudContainerManager/enableApp(_:timeout:inContainer:)`` and ``NextcloudContainerManager/disableApp(_:timeout:inContainer:)`` for apps, and ``NextcloudContainerManager/addUser(_:timeout:inContainer:)``, ``NextcloudContainerManager/removeUser(_:timeout:inContainer:)``, ``NextcloudContainerManager/enableUser(_:timeout:inContainer:)`` and ``NextcloudContainerManager/disableUser(_:timeout:inContainer:)`` for users.
@@ -99,7 +105,7 @@ print("Push endpoint on port \(container.pushPort!)")
 ```
 
 The `notify_push` app requires a Redis server, so the deployment additionally spins up a Redis sidecar on a dedicated network, configures the Nextcloud instance to use it, installs the app, launches its push daemon inside the container and registers it with the server.
-The host port the endpoint is reachable on is reported as ``NextcloudContainer/pushPort``, and clients discover it automatically through the Nextcloud capabilities API.
+The host port the endpoint is reachable on from this machine is reported as ``NextcloudContainer/pushPort``, and clients discover it automatically through the Nextcloud capabilities API.
 ``NextcloudContainerManager/delete(_:)`` removes the sidecar and network along with the container.
 
 ## Topics
